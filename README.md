@@ -1,6 +1,6 @@
-# WebChat：一个AI助手，可以帮你理解和分析当前网页的内容。
+# WebChat：可以帮你理解和分析当前网页的内容的AI助手
 
-基于Chrome扩展的最佳实践开发，AI助手能够基于当前网页内容进行智能问答。支持自定义API和本地大模型。
+**【完全开源】** 基于Chrome扩展的最佳实践开发，AI助手能够基于当前网页内容进行智能问答。支持自定义API和本地大模型。
 
 ## 功能特点
 
@@ -15,7 +15,7 @@ https://github.com/user-attachments/assets/8c259442-7a0f-4cfc-ab84-befceaebe663
 
 ## 安装方法
 
-1. 下载项目代码
+1. 下载项目代码：`https://github.com/Airmomo/WebChat.git`
 2. 打开Chrome扩展管理页面 (chrome://extensions/)
 3. 开启"开发者模式"
 4. 点击"加载已解压的扩展程序"
