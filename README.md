@@ -11,9 +11,7 @@
 
 ## 演示视频
 
-<video width="320" height="240" controls>
-  <source src="./static/WetChat-show.mp4" type="video/mp4">
-</video>
+<video controls src="https://github.com/Airmomo/WebChat/blob/main/static/WetChat-show.mp4" title="./static/WetChat-show.mp4"></video>
 
 ## 安装方法
 
