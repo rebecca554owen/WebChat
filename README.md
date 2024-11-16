@@ -11,7 +11,7 @@
 
 ## 演示视频
 
-https://github.com/Airmomo/WebChat/blob/main/static/WetChat-show.mp4
+https://github.com/user-attachments/assets/8ef0890c-b6c2-463f-a115-af00ee14122a
 
 ## 安装方法
 
