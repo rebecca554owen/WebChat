@@ -12,8 +12,7 @@
 ## 演示视频
 
 <video width="320" height="240" controls>
-  <source src="./static/WetChat演示.mov" type="video/mov">
-  Your browser does not support the video tag.
+  <source src="./static/WetChat-show.mp4" type="video/mp4">
 </video>
 
 ## 安装方法
