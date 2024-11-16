@@ -11,7 +11,7 @@
 
 ## 演示视频
 
-https://github.com/user-attachments/assets/8ef0890c-b6c2-463f-a115-af00ee14122a
+https://github.com/user-attachments/assets/8c259442-7a0f-4cfc-ab84-befceaebe663
 
 ## 安装方法
 
