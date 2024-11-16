@@ -15,8 +15,8 @@ https://github.com/user-attachments/assets/8c259442-7a0f-4cfc-ab84-befceaebe663
 
 ## 安装方法
 
-1. 下载项目代码：`https://github.com/Airmomo/WebChat.git`
-2. 打开Chrome扩展管理页面 (chrome://extensions/)
+1. 下载项目代码：`git clone https://github.com/Airmomo/WebChat.git`
+2. 打开Chrome扩展管理页面：`chrome://extensions/`
 3. 开启"开发者模式"
 4. 点击"加载已解压的扩展程序"
 5. 选择项目文件夹
