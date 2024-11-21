@@ -139,6 +139,20 @@ chrome.runtime.onConnect.addListener((port) => {
     }
 });
 
+// 监听设置变更
+chrome.storage.onChanged.addListener((changes, namespace) => {
+    if (namespace === 'sync') {
+        // 如果禁用了上下文，清除所有标签页的历史记录
+        if (changes.enableContext && !changes.enableContext.newValue) {
+            sessionHistories = {};
+        }
+        // 如果修改了系统提示词，立即生效
+        if (changes.systemPrompt) {
+            console.log('系统提示词已更新:', changes.systemPrompt.newValue);
+        }
+    }
+});
+
 // 修改handleAnswerGeneration函数
 async function handleAnswerGeneration(port, tabId, pageContent, question) {
     try {
@@ -162,15 +176,17 @@ async function handleAnswerGeneration(port, tabId, pageContent, question) {
             pendingQuestion: question
         };
 
-        // 获取设置
+        // 获取最新的设置，确保获取到最新的系统提示词
         const settings = await chrome.storage.sync.get({
             apiType: 'custom',
             maxTokens: 2048,
             temperature: 0.7,
+            enableContext: true,
+            systemPrompt: '你是一个帮助理解网页内容的AI助手。请使用Markdown格式回复。',
             custom_apiKey: '',
             custom_apiBase: 'https://api.openai.com/v1/chat/completions',
             custom_model: 'gpt-3.5-turbo',
-            ollama_apiKey: 'ollama',
+            ollama_apiKey: '',
             ollama_apiBase: 'http://127.0.0.1:11434/api/chat',
             ollama_model: 'qwen2.5'
         });
@@ -180,29 +196,39 @@ async function handleAnswerGeneration(port, tabId, pageContent, question) {
         const apiBase = settings[`${settings.apiType}_apiBase`];
         const model = settings[`${settings.apiType}_model`];
 
-        // 构建请求
-        const headers = {
-            'Content-Type': 'application/json'
-        };
+        // 构建消息历史，使用最新的系统提示词
+        let messages = [
+            {
+                role: "system",
+                content: settings.systemPrompt // 使用最新的系统提示词
+            }
+        ];
 
-        if (settings.apiType === 'custom') {
-            headers['Authorization'] = `Bearer ${apiKey}`;
+        // 如果启用了上下文，添加历史消息
+        if (settings.enableContext) {
+            const history = sessionHistories[tabId] || [];
+            // 只添加最近的几条消息作为上下文，避免超出token限制
+            const recentHistory = history.slice(-6); // 保留最近3轮对话（6条消息）
+            recentHistory.forEach(msg => {
+                messages.push({
+                    role: msg.isUser ? "user" : "assistant",
+                    content: msg.content
+                });
+            });
         }
 
+        // 添加当前问题
+        messages.push({
+            role: "user",
+            content: `基于以下网页内容回答问题：\n\n${pageContent}\n\n问题：${question}`
+        });
+
+        // 构建请求体
         let requestBody;
         if (settings.apiType === 'ollama') {
             requestBody = {
                 model: model,
-                messages: [
-                    {
-                        role: "system",
-                        content: "你是一个帮助理解网页内容的AI助手。请使用Markdown格式回复。"
-                    },
-                    {
-                        role: "user",
-                        content: `基于以下网页内容回答问题：\n\n${pageContent}\n\n问题：${question}`
-                    }
-                ],
+                messages: messages,
                 stream: true,
                 options: {
                     temperature: settings.temperature,
@@ -212,23 +238,24 @@ async function handleAnswerGeneration(port, tabId, pageContent, question) {
         } else {
             requestBody = {
                 model: model,
-                messages: [
-                    {
-                        role: "system",
-                        content: "你是一个帮助理解网页内容的AI助手。请使用Markdown格式回复。"
-                    },
-                    {
-                        role: "user",
-                        content: `基于以下网页内容回答问题：\n\n${pageContent}\n\n问题：${question}`
-                    }
-                ],
+                messages: messages,
                 max_tokens: settings.maxTokens,
                 temperature: settings.temperature,
-                stream: true // 启用流式输出
+                stream: true
             };
         }
 
         let fullAnswer = ''; // 用于累积完整的答案
+
+        // 构建请求头
+        const headers = {
+            'Content-Type': 'application/json'
+        };
+
+        // 如果是自定义API，添加Authorization头
+        if (settings.apiType === 'custom') {
+            headers['Authorization'] = `Bearer ${apiKey}`;
+        }
 
         const response = await fetch(apiBase, {
             method: 'POST',
@@ -243,6 +270,23 @@ async function handleAnswerGeneration(port, tabId, pageContent, question) {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let accumulatedResponse = '';
+
+        // 估算输入tokens（简单实现，可以根据需要调整）
+        const systemPrompt = settings.systemPrompt;
+        const inputContent = `基于以下网页内容回答问题：\n\n${pageContent}\n\n问题：${question}`;
+        const inputTokens = Math.ceil((systemPrompt.length + inputContent.length) / 4);
+
+        // 发送输入tokens数量
+        if (port) {
+            try {
+                port.postMessage({
+                    type: 'input-tokens',
+                    tokens: inputTokens
+                });
+            } catch (portError) {
+                console.log('Port disconnected during input tokens sending');
+            }
+        }
 
         while (true) {
             try {
@@ -283,10 +327,13 @@ async function handleAnswerGeneration(port, tabId, pageContent, question) {
                             if (content && port) { // 检查端口是否存在
                                 accumulatedResponse += content;
                                 try {
+                                    // 估算输出tokens数量
+                                    const outputTokens = Math.ceil(content.length / 4);
                                     port.postMessage({
                                         type: 'answer-chunk',
                                         content: content,
-                                        markdownContent: accumulatedResponse
+                                        markdownContent: accumulatedResponse,
+                                        tokens: outputTokens
                                     });
                                 } catch (portError) {
                                     console.log('Port disconnected during message sending');
@@ -324,13 +371,15 @@ async function handleAnswerGeneration(port, tabId, pageContent, question) {
                     markdownContent: accumulatedResponse
                 });
 
-                // 保存对话历史
-                const history = sessionHistories[tabId] || [];
-                history.push(
-                    { isUser: true, content: question, markdownContent: question },
-                    { isUser: false, content: accumulatedResponse, markdownContent: accumulatedResponse }
-                );
-                sessionHistories[tabId] = history;
+                // 只有在启用上下文时才保存历史
+                if (settings.enableContext) {
+                    const history = sessionHistories[tabId] || [];
+                    history.push(
+                        { isUser: true, content: question, markdownContent: question },
+                        { isUser: false, content: accumulatedResponse, markdownContent: accumulatedResponse }
+                    );
+                    sessionHistories[tabId] = history;
+                }
             } catch (portError) {
                 console.log('Port disconnected during final message sending');
             }

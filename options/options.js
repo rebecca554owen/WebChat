@@ -519,9 +519,52 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 从存储中加载设置
     chrome.storage.sync.get({
-        autoHideDialog: true // 默认开启
+        autoHideDialog: true,
+        enableContext: true,
+        maxContextRounds: 3,
+        systemPrompt: '你是一个帮助理解网页内容的AI助手。请使用Markdown格式回复。' // 默认提示词
     }, (items) => {
         autoHideDialog.checked = items.autoHideDialog;
+        enableContext.checked = items.enableContext;
+        maxContextRounds.value = items.maxContextRounds;
+        systemPrompt.value = items.systemPrompt;
+
+        // 根据是否启用上下文来显示/隐藏轮数设置
+        contextSettings.style.display = items.enableContext ? 'block' : 'none';
+    });
+
+    // 监听上下文启用状态变化
+    enableContext.addEventListener('change', () => {
+        const isEnabled = enableContext.checked;
+        contextSettings.style.display = isEnabled ? 'block' : 'none';
+        chrome.storage.sync.set({
+            enableContext: isEnabled
+        });
+    });
+
+    // 监听对话轮数变化
+    maxContextRounds.addEventListener('change', () => {
+        let value = parseInt(maxContextRounds.value);
+        // 确保值在有效范围内
+        value = Math.max(1, Math.min(10, value));
+        maxContextRounds.value = value;
+        chrome.storage.sync.set({
+            maxContextRounds: value
+        });
+    });
+
+    // 监听系统提示词变化
+    let promptTimeout;
+    systemPrompt.addEventListener('input', () => {
+        // 使用防抖处理保存
+        if (promptTimeout) {
+            clearTimeout(promptTimeout);
+        }
+        promptTimeout = setTimeout(() => {
+            chrome.storage.sync.set({
+                systemPrompt: systemPrompt.value || '你是一个帮助理解网页内容的AI助手。请使用Markdown格式回复。'
+            });
+        }, 1000);
     });
 
     // 使用防抖函数来限制保存频率

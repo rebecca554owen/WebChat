@@ -42,6 +42,7 @@ function createDialog() {
     dialog.innerHTML = `
         <div class="container">
             <div class="header">
+                <div class="tokens-counter">Tokens: 0</div>
             </div>
             <div id="chat-container" class="chat-container">
                 <div id="messages" class="messages"></div>
@@ -235,7 +236,7 @@ function createDialog() {
 
     document.body.appendChild(dialog);
 
-    // 修改点击外部关闭功能
+    // 修改点���外部关闭功能
     document.addEventListener('mousedown', async (e) => {
         const ball = document.getElementById('ai-assistant-ball');
         const contextMenu = document.querySelector('.context-menu');
@@ -698,7 +699,7 @@ async function sendMessageWithRetry(message, maxRetries = 3) {
     }
 }
 
-// 移除全局错误监听器中的通知显示
+// 移除全局���误监听器中的通知显示
 window.addEventListener('error', (event) => {
     if (event.error && event.error.message.includes('Extension context invalidated')) {
         event.preventDefault(); // 阻止错误继续传播
@@ -1105,15 +1106,28 @@ async function initializeDialog(dialog) {
                 currentPort = chrome.runtime.connect({ name: "answerStream" });
                 let currentAnswer = '';
 
+                const tokensCounter = dialog.querySelector('.tokens-counter');
+                let totalTokens = 0;
+
+                // 修改消��监听器
                 currentPort.onMessage.addListener(async (msg) => {
                     try {
-                        if (msg.type === 'answer-chunk') {
+                        if (msg.type === 'input-tokens') {
+                            // 更新输入Tokens计数
+                            totalTokens += msg.tokens;
+                            tokensCounter.textContent = `Tokens: ${totalTokens}`;
+                        } else if (msg.type === 'answer-chunk') {
                             currentAnswer += msg.content;
                             try {
                                 messageDiv.dataset.markdownContent = msg.markdownContent || currentAnswer;
                                 messageDiv.innerHTML = markedInstance(currentAnswer);
                             } catch (error) {
                                 messageDiv.textContent = currentAnswer;
+                            }
+                            // 更新输出Tokens计数
+                            if (msg.tokens) {
+                                totalTokens += msg.tokens;
+                                tokensCounter.textContent = `Tokens: ${totalTokens}`;
                             }
                             autoScroll();
                         } else if (msg.type === 'answer-end') {
@@ -1134,6 +1148,9 @@ async function initializeDialog(dialog) {
                             currentAnswer = '';
                             userHasScrolled = false;
                             autoScroll(true);
+
+                            // 保存Tokens计数到存储
+                            chrome.storage.sync.set({ totalTokens });
                         } else if (msg.type === 'error') {
                             messageDiv.remove();
                             addMessage('发生错误：' + msg.error, false);
@@ -1185,6 +1202,12 @@ async function initializeDialog(dialog) {
         userInput.addEventListener('input', () => {
             userInput.style.height = 'auto';
             userInput.style.height = Math.min(userInput.scrollHeight, 100) + 'px';
+        });
+
+        // 从存储中加载Tokens计数
+        chrome.storage.sync.get({ totalTokens: 0 }, (items) => {
+            totalTokens = items.totalTokens;
+            tokensCounter.textContent = `Tokens: ${totalTokens}`;
         });
 
         // 加载初始历史记录

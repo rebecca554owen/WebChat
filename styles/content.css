@@ -784,3 +784,17 @@
     /* ... 其他样式保持不变 ... */
     z-index: 2147483645 !important;
 }
+
+/* 修改Tokens统计样式，隐藏显示 */
+#ai-assistant-dialog .tokens-counter {
+    position: absolute !important;
+    top: 0 !important;
+    right: 8px !important;
+    font-size: 12px !important;
+    color: #666 !important;
+    padding: 4px 8px !important;
+    background: transparent !important;
+    z-index: 1 !important;
+    user-select: none !important;
+    display: none !important;
+}

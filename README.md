@@ -2,21 +2,26 @@
 
 **【完全开源】** 基于Chrome扩展的最佳实践开发，AI助手能够基于当前网页内容进行智能问答。支持自定义API和本地大模型。
 
-## 功能特点
+## 功能特性
 
-- 🤖 基于网页内容的智能问答
-- 💬 流式输出回答内容
-- 📝 消息渲染支持Markdown格式
-- 🛠️ 支持自定义API和本地模型
+- ✅🤖 基于网页内容的智能问答
+- ✅💬 流式输出回答内容
+- ✅📝 消息渲染支持Markdown格式
+- ✅🛠️ 支持自定义API和本地模型
+- ✅🔍 聊天支持上下文
+- ✅🔢 自定义保留对话轮数(避免超出模型上下文长度限制)
+- ✅✍️ 自定义系统提示词(不会影响其作为网页AI助手的本质)
 
 ## 演示视频
+
+**由于项目内容会更新，所以实际设置与功能展示可能与演示视频有些不同，请以实际使用为准。**
 
 https://github.com/user-attachments/assets/a0ae0231-cc22-43d4-811f-b1a6e95f3d19
 
 ## 安装方法
 
-1. 下载项目代码：`git clone https://github.com/Airmomo/WebChat.git`
-2. 打开Chrome扩展管理页面：`chrome://extensions/`
+1. 下载项目代码：`https://github.com/Airmomo/WebChat.git`
+2. 打开Chrome扩展管理页面 (chrome://extensions/)
 3. 开启"开发者模式"
 4. 点击"加载已解压的扩展程序"
 5. 选择项目文件夹

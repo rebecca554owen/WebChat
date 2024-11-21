@@ -19,6 +19,24 @@
                     点击对话框外部时自动隐藏对话框
                 </label>
             </div>
+            <div class="setting-item">
+                <label class="setting-label">
+                    <input type="checkbox" id="enableContext" checked>
+                    启用上下文聊天（包含历史对话记录）
+                </label>
+            </div>
+            <div id="contextSettings" class="sub-settings">
+                <div class="setting-item">
+                    <label for="maxContextRounds">保留最近对话轮数</label>
+                    <input type="number" id="maxContextRounds" min="1" max="10" value="3">
+                    <div class="help-text">设置保留最近几轮对话作为上下文（1-10轮），每轮包含一问一答</div>
+                </div>
+            </div>
+            <div class="setting-item">
+                <label for="systemPrompt">系统提示词</label>
+                <textarea id="systemPrompt" rows="3" placeholder="你是一个帮助理解网页内容的AI助手。请使用Markdown格式回复。"></textarea>
+                <div class="help-text">设置AI助手的角色和行为。留空则使用默认提示词。</div>
+            </div>
         </div>
 
         <div class="settings-section">
