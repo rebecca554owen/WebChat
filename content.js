@@ -236,7 +236,7 @@ function createDialog() {
 
     document.body.appendChild(dialog);
 
-    // 修改点���外部关闭功能
+    // 修改点击外部关闭功能
     document.addEventListener('mousedown', async (e) => {
         const ball = document.getElementById('ai-assistant-ball');
         const contextMenu = document.querySelector('.context-menu');
@@ -699,7 +699,7 @@ async function sendMessageWithRetry(message, maxRetries = 3) {
     }
 }
 
-// 移除全局���误监听器中的通知显示
+// 移除全局错误监听器中的通知显示
 window.addEventListener('error', (event) => {
     if (event.error && event.error.message.includes('Extension context invalidated')) {
         event.preventDefault(); // 阻止错误继续传播
@@ -1109,7 +1109,7 @@ async function initializeDialog(dialog) {
                 const tokensCounter = dialog.querySelector('.tokens-counter');
                 let totalTokens = 0;
 
-                // 修改消��监听器
+                // 修改消息监听器
                 currentPort.onMessage.addListener(async (msg) => {
                     try {
                         if (msg.type === 'input-tokens') {
