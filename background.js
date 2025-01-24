@@ -162,7 +162,6 @@ async function handleAnswerGeneration(port, tabId, pageContent, question) {
 
         // 只有当最后一条不是相同的用户消息时才添加
         if (!lastMessage || !lastMessage.isUser || lastMessage.content !== question) {
-            chatHistory.push({ content: question, isUser: true });
             sessionHistories[tabId] = chatHistory;
         }
 
