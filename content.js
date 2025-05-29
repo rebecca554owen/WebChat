@@ -7,9 +7,11 @@ function parseWebContent() {
     const styles = docClone.querySelectorAll('style, link[rel="stylesheet"]');
     const headers = docClone.querySelectorAll('header, nav');
     const footers = docClone.querySelectorAll('footer');
+    // 移除WebChat对话窗口
+    const chatDialog = docClone.querySelectorAll('#ai-assistant-dialog');
 
     // 从克隆的文档中移除元素
-    [...scripts, ...styles, ...headers, ...footers].forEach(element => {
+    [...scripts, ...styles, ...headers, ...footers, ...chatDialog].forEach(element => {
         if (element.parentNode) {
             element.parentNode.removeChild(element);
         }
@@ -42,7 +44,6 @@ function createDialog() {
     dialog.innerHTML = `
         <div class="container">
             <div class="header">
-                <div class="tokens-counter">Tokens: 0</div>
             </div>
             <div id="chat-container" class="chat-container">
                 <div id="messages" class="messages"></div>
@@ -850,12 +851,12 @@ async function initializeDialog(dialog) {
             characterData: true
         });
 
-        // 修改dialog的show类添加监听
+        // 对话框显示监听
         const dialogObserver = new MutationObserver((mutations) => {
             mutations.forEach((mutation) => {
                 if (mutation.target.classList.contains('show')) {
                     userHasScrolled = false;
-                    autoScroll(true); // 强制滚动到底部
+                    autoScroll(true);
                 }
             });
         });
@@ -865,30 +866,23 @@ async function initializeDialog(dialog) {
             attributeFilter: ['class']
         });
 
-        // 获取当前标签页ID
+        // 获取标签页ID
         let tabId;
         try {
             const response = await sendMessageWithRetry({ action: 'getCurrentTab' });
-            if (!response) {
-                throw new Error('无法获取标签页ID');
-            }
+            if (!response) throw new Error('无法获取标签页ID');
             tabId = response.tabId;
         } catch (error) {
             console.error('获取标签页ID失败:', error);
             return;
         }
 
-        // 初化marked
         const markedInstance = await initMarked();
 
-        // 加载历史会话
+        // 加载历史
         async function loadHistory() {
             try {
-                const response = await sendMessageWithRetry({
-                    action: 'getHistory',
-                    tabId: tabId
-                });
-
+                const response = await sendMessageWithRetry({ action: 'getHistory', tabId });
                 messagesContainer.innerHTML = '';
 
                 if (!response || !response.history || response.history.length === 0) {
@@ -900,17 +894,12 @@ async function initializeDialog(dialog) {
                     response.history.forEach(msg => {
                         const messageDiv = document.createElement('div');
                         messageDiv.className = `message ${msg.isUser ? 'user-message' : 'assistant-message'}`;
-
-                        // 保存原始的Markdown内容
                         messageDiv.dataset.markdownContent = msg.markdownContent || msg.content;
 
                         try {
-                            // 对所有消息使用Markdown渲染
                             messageDiv.innerHTML = markedInstance(msg.markdownContent || msg.content);
-                            // 添加右键菜单事件监听
                             messageDiv.addEventListener('contextmenu', (e) => {
-                                const markdownContent = messageDiv.dataset.markdownContent;
-                                handleContextMenu(e, messageDiv, markdownContent);
+                                handleContextMenu(e, messageDiv, messageDiv.dataset.markdownContent);
                             });
                         } catch (error) {
                             console.error('Markdown渲染失败:', error);
@@ -923,23 +912,11 @@ async function initializeDialog(dialog) {
                 messagesContainer.scrollTop = messagesContainer.scrollHeight;
             } catch (error) {
                 console.error('加载历史记录失败:', error);
-                messagesContainer.innerHTML = `
-                    <div class="welcome-message">
-                        <p>👋 你好！我是AI助手，可以帮你理解和分析当前网页的内容。</p>
-                    </div>
-                `;
+                messagesContainer.innerHTML = '<div class="welcome-message"><p>👋 你好！我是AI助手，可以帮你理解和分析当前网页的内容。</p></div>';
             }
         }
 
-        // 添加复制功能
-        function createCopyButton() {
-            const button = document.createElement('button');
-            button.className = 'copy-button';
-            button.innerHTML = '📋 复制';
-            return button;
-        }
-
-        // 复制文本到剪贴板
+        // 复制到剪贴板
         async function copyToClipboard(text) {
             try {
                 await navigator.clipboard.writeText(text);
@@ -950,33 +927,22 @@ async function initializeDialog(dialog) {
             }
         }
 
-        // 修改handleContextMenu函数
+        // 右键菜单
         function handleContextMenu(e, messageDiv, content) {
             e.preventDefault();
             e.stopPropagation();
 
-            // 移除可能存在的旧菜单
             const oldMenu = document.querySelector('.context-menu');
-            if (oldMenu) {
-                oldMenu.remove();
-            }
+            if (oldMenu) oldMenu.remove();
 
-            // 获取要复制的内容
-            // 对于AI回复，优先使用保存的Markdown内容
             const textToCopy = messageDiv.classList.contains('assistant-message')
                 ? messageDiv.dataset.markdownContent || content || messageDiv.textContent
                 : content;
 
-            console.log('Copy content:', textToCopy); // 调试日志
-
-            // 创建右键菜单
             const menu = document.createElement('div');
             menu.className = 'context-menu';
-            menu.style.position = 'fixed';
-            menu.style.left = `${e.clientX}px`;
-            menu.style.top = `${e.clientY}px`;
+            menu.style.cssText = `position: fixed; left: ${e.clientX}px; top: ${e.clientY}px;`;
 
-            // 添加复制选项
             const copyOption = document.createElement('div');
             copyOption.className = 'context-menu-item';
             copyOption.innerHTML = '📋 复制该消息';
@@ -985,29 +951,18 @@ async function initializeDialog(dialog) {
                 e.stopPropagation();
                 const success = await copyToClipboard(textToCopy);
                 if (success) {
-                    // 显示复制成功提示
                     const toast = document.createElement('div');
                     toast.className = 'copy-toast';
                     toast.textContent = '✓ 已复制';
-                    toast.style.position = 'fixed';
-                    toast.style.left = `${e.clientX}px`;
-                    toast.style.top = `${e.clientY - 40}px`;
-                    toast.style.transform = 'translate(-50%, -50%)';
+                    toast.style.cssText = `position: fixed; left: ${e.clientX}px; top: ${e.clientY - 40}px; transform: translate(-50%, -50%);`;
                     document.body.appendChild(toast);
-
-                    // 2秒后移除提示
-                    setTimeout(() => {
-                        toast.remove();
-                    }, 2000);
+                    setTimeout(() => toast.remove(), 2000);
                 }
                 menu.remove();
             };
             menu.appendChild(copyOption);
-
-            // 添加菜单到页面
             document.body.appendChild(menu);
 
-            // 点击其他地方时关闭菜单
             const closeMenu = (event) => {
                 if (!menu.contains(event.target)) {
                     menu.remove();
@@ -1017,7 +972,7 @@ async function initializeDialog(dialog) {
             document.addEventListener('mousedown', closeMenu);
         }
 
-        // 修改addMessage函数
+        // 添加消息
         function addMessage(content, isUser = false) {
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${isUser ? 'user-message' : 'assistant-message'}`;
@@ -1025,15 +980,11 @@ async function initializeDialog(dialog) {
             if (!isUser && content === '') {
                 messageDiv.setAttribute('data-pending', 'true');
             } else {
-                // 保存原始的Markdown内容
                 messageDiv.dataset.markdownContent = content;
-
                 try {
-                    // 无论是用户消息还是AI回复，都使用Markdown渲染
                     messageDiv.innerHTML = markedInstance(content);
                     messageDiv.addEventListener('contextmenu', (e) => {
-                        const markdownContent = messageDiv.dataset.markdownContent;
-                        handleContextMenu(e, messageDiv, markdownContent);
+                        handleContextMenu(e, messageDiv, messageDiv.dataset.markdownContent);
                     });
                 } catch (error) {
                     console.error('Markdown渲染失败:', error);
@@ -1046,20 +997,19 @@ async function initializeDialog(dialog) {
             return messageDiv;
         }
 
-        // 添加打字指示器
+        // 打字指示器
         function addTypingIndicator() {
             const indicatorDiv = document.createElement('div');
             indicatorDiv.className = 'message assistant-message typing-indicator';
             indicatorDiv.innerHTML = '<span></span><span></span><span></span>';
             messagesContainer.appendChild(indicatorDiv);
-            autoScroll(); // 使用自动滚动函数
+            autoScroll();
             return indicatorDiv;
         }
 
-        // 修改handleUserInput函数
+        // 处理用户输入
         async function handleUserInput() {
             if (isGenerating) {
-                // 如果正在生成，点击按钮则停止生成
                 if (currentPort) {
                     currentPort.disconnect();
                     currentPort = null;
@@ -1070,17 +1020,11 @@ async function initializeDialog(dialog) {
                 askButton.classList.remove('generating');
                 userInput.focus();
 
-                // 移除正在生成的消息和加载指示器
                 const pendingMessage = document.querySelector('.message[data-pending="true"]');
                 const typingIndicator = document.querySelector('.typing-indicator');
-                if (pendingMessage) {
-                    pendingMessage.remove();
-                }
-                if (typingIndicator) {
-                    typingIndicator.remove();
-                }
+                if (pendingMessage) pendingMessage.remove();
+                if (typingIndicator) typingIndicator.remove();
 
-                // 添加中断提示消息
                 addMessage('已停止回复', false);
                 return;
             }
@@ -1100,23 +1044,13 @@ async function initializeDialog(dialog) {
                 const messageDiv = addMessage('', false);
                 const typingIndicator = addTypingIndicator();
 
-                if (currentPort) {
-                    currentPort.disconnect();
-                }
+                if (currentPort) currentPort.disconnect();
                 currentPort = chrome.runtime.connect({ name: "answerStream" });
                 let currentAnswer = '';
 
-                const tokensCounter = dialog.querySelector('.tokens-counter');
-                let totalTokens = 0;
-
-                // 修改消息监听器
                 currentPort.onMessage.addListener(async (msg) => {
                     try {
-                        if (msg.type === 'input-tokens') {
-                            // 更新输入Tokens计数
-                            totalTokens += msg.tokens;
-                            tokensCounter.textContent = `Tokens: ${totalTokens}`;
-                        } else if (msg.type === 'answer-chunk') {
+                        if (msg.type === 'answer-chunk') {
                             currentAnswer += msg.content;
                             try {
                                 messageDiv.dataset.markdownContent = msg.markdownContent || currentAnswer;
@@ -1124,18 +1058,12 @@ async function initializeDialog(dialog) {
                             } catch (error) {
                                 messageDiv.textContent = currentAnswer;
                             }
-                            // 更新输出Tokens计数
-                            if (msg.tokens) {
-                                totalTokens += msg.tokens;
-                                tokensCounter.textContent = `Tokens: ${totalTokens}`;
-                            }
                             autoScroll();
                         } else if (msg.type === 'answer-end') {
                             messageDiv.removeAttribute('data-pending');
                             messageDiv.dataset.markdownContent = msg.markdownContent || currentAnswer;
                             messageDiv.addEventListener('contextmenu', (e) => {
-                                const markdownContent = messageDiv.dataset.markdownContent;
-                                handleContextMenu(e, messageDiv, markdownContent);
+                                handleContextMenu(e, messageDiv, messageDiv.dataset.markdownContent);
                             });
 
                             isGenerating = false;
@@ -1148,9 +1076,6 @@ async function initializeDialog(dialog) {
                             currentAnswer = '';
                             userHasScrolled = false;
                             autoScroll(true);
-
-                            // 保存Tokens计数到存储
-                            chrome.storage.sync.set({ totalTokens });
                         } else if (msg.type === 'error') {
                             messageDiv.remove();
                             addMessage('发生错误：' + msg.error, false);
@@ -1204,17 +1129,11 @@ async function initializeDialog(dialog) {
             userInput.style.height = Math.min(userInput.scrollHeight, 100) + 'px';
         });
 
-        // 从存储中加载Tokens计数
-        chrome.storage.sync.get({ totalTokens: 0 }, (items) => {
-            totalTokens = items.totalTokens;
-            tokensCounter.textContent = `Tokens: ${totalTokens}`;
-        });
 
-        // 加载初始历史记录
+
         await loadHistory();
     } catch (error) {
         console.error('初始化对话框失败:', error);
-        // 显示友好的错误提示
         const errorDiv = document.createElement('div');
         errorDiv.className = 'welcome-message';
         errorDiv.innerHTML = '<p>⚠️ 初始化失败，请刷新页面后重试</p>';
@@ -1222,14 +1141,13 @@ async function initializeDialog(dialog) {
     }
 }
 
-// 添加"回到当前消息"按钮
+// 创建滚动到底部按钮
 function createScrollToBottomButton(messagesContainer) {
     const button = document.createElement('button');
     button.className = 'scroll-to-bottom-button';
     button.innerHTML = '↓ 回到当前消息';
-    button.style.display = 'none'; // 初始状态隐藏
+    button.style.display = 'none';
 
-    // 点击事件
     button.addEventListener('click', () => {
         messagesContainer.scrollTo({
             top: messagesContainer.scrollHeight,
@@ -1242,29 +1160,9 @@ function createScrollToBottomButton(messagesContainer) {
     return button;
 }
 
-// 添加错误恢复机制
+// 错误恢复
 window.addEventListener('error', (event) => {
     if (event.error && event.error.message.includes('Extension context invalidated')) {
-        // 显示友好的错误提示
-        const notification = document.createElement('div');
-        notification.style.cssText = `
-            position: fixed;
-            right: 20px;
-            top: 20px;
-            padding: 10px 20px;
-            background: rgba(0, 0, 0, 0.8);
-            color: white;
-            border-radius: 4px;
-            z-index: 10000;
-            font-size: 14px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-        `;
-        notification.textContent = '扩展已更新，请刷新页面以继续使用';
-        document.body.appendChild(notification);
-
-        // 3秒后自动移除提示
-        setTimeout(() => {
-            notification.remove();
-        }, 3000);
+        showNotification('扩展已更新，请刷新页面以继续使用');
     }
-}); 
+});
