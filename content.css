@@ -1,0 +1,812 @@
+/* AI助手内容脚本样式文件 */
+/* 根据 content.js 的函数顺序和功能模块重新组织 */
+
+/* ==================== 基础重置和初始化样式 ==================== */
+
+/* 通知样式 */
+.extension-notification {
+    position: fixed;
+    right: 20px;
+    top: 20px;
+    padding: 10px 20px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    border-radius: 4px;
+    z-index: 10000;
+    font-size: 14px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    animation: fadeInOut 3s ease forwards;
+}
+
+@keyframes fadeInOut {
+    0% {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    20%, 80% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+}
+
+/* ==================== 对话框相关样式 ==================== */
+
+/* 对话框主体 */
+#ai-assistant-dialog {
+    position: fixed;
+    right: 20px;
+    bottom: 80px;
+    width: min(400px, 90vw);
+    height: min(500px, 80vh);
+    min-width: 300px;
+    min-height: 400px;
+    background-color: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    z-index: 2147483645;
+    overflow: hidden;
+    transform-origin: bottom right;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    opacity: 0;
+    transform: scale(0.3);
+    pointer-events: none;
+    visibility: hidden;
+    resize: none;
+}
+
+#ai-assistant-dialog.show {
+    opacity: 1;
+    transform: scale(1);
+    pointer-events: auto;
+    visibility: visible;
+    animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#ai-assistant-dialog.hide {
+    animation: slideOut 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 对话框容器 */
+#ai-assistant-dialog .container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+    background-color: #f5f5f5;
+    position: relative;
+    z-index: 1;
+}
+
+/* 对话框头部 */
+#ai-assistant-dialog .header {
+    padding: 8px 16px;
+    border-bottom: 1px solid #eee;
+    background-color: #fff;
+    min-height: 0px;
+    display: flex;
+    align-items: center;
+}
+
+/* Tokens统计样式 */
+#ai-assistant-dialog .tokens-counter {
+    position: absolute;
+    top: 0;
+    right: 8px;
+    font-size: 12px;
+    color: #666;
+    padding: 4px 8px;
+    background: transparent;
+    z-index: 1;
+    user-select: none;
+    display: none;
+}
+
+/* 聊天容器 */
+#ai-assistant-dialog .chat-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    background-color: #fff;
+    min-height: 0;
+    position: relative;
+    z-index: 1;
+}
+
+/* ==================== 拖拽和调整大小功能样式 ==================== */
+
+/* 调整大小手柄 */
+#ai-assistant-dialog .resize-handle {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    right: 0;
+    bottom: 0;
+    cursor: se-resize;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2147483645;
+}
+
+#ai-assistant-dialog .resize-handle::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-right: 2px solid #999;
+    border-bottom: 2px solid #999;
+    position: absolute;
+    right: 4px;
+    bottom: 4px;
+}
+
+/* 遮罩层样式 */
+.dialog-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: transparent;
+    z-index: 2147483644;
+    pointer-events: none;
+}
+
+.dialog-overlay.dragging {
+    display: block;
+    pointer-events: auto;
+}
+
+/* ==================== 消息容器和历史记录样式 ==================== */
+
+/* 欢迎消息 */
+#ai-assistant-dialog .welcome-message {
+    text-align: center;
+    color: #666;
+    padding: 10px;
+    margin-bottom: 10px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+}
+
+/* 消息容器 */
+#ai-assistant-dialog .messages {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+    position: relative;
+    z-index: 1;
+}
+
+/* 消息基础样式 */
+#ai-assistant-dialog .message {
+    max-width: min(85%, calc(100% - 40px));
+    padding: 10px 14px;
+    border-radius: 12px;
+    word-wrap: break-word;
+    position: relative;
+}
+
+/* 用户消息样式 */
+#ai-assistant-dialog .user-message {
+    align-self: flex-end;
+    background-color: #007AFF;
+    color: white;
+    border-radius: 12px 12px 2px 12px;
+    max-width: 85%;
+}
+
+/* 用户消息中的Markdown样式 */
+#ai-assistant-dialog .user-message code {
+    background-color: rgba(255, 255, 255, 0.1);
+    padding: 2px 4px;
+    border-radius: 4px;
+    font-family: monospace;
+}
+
+#ai-assistant-dialog .user-message pre {
+    background-color: rgba(255, 255, 255, 0.1);
+    padding: 8px;
+    border-radius: 4px;
+    overflow-x: auto;
+    margin: 8px 0;
+}
+
+#ai-assistant-dialog .user-message a {
+    color: white;
+    text-decoration: underline;
+}
+
+#ai-assistant-dialog .user-message p {
+    margin: 0;
+}
+
+#ai-assistant-dialog .user-message ul,
+#ai-assistant-dialog .user-message ol {
+    margin: 4px 0;
+    padding-left: 20px;
+}
+
+#ai-assistant-dialog .user-message blockquote {
+    border-left: 3px solid rgba(255, 255, 255, 0.3);
+    margin: 4px 0;
+    padding-left: 8px;
+}
+
+/* 助手消息样式 */
+#ai-assistant-dialog .assistant-message {
+    align-self: flex-start;
+    background-color: #f0f0f0;
+    color: #000;
+    border-radius: 12px 12px 12px 2px;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+/* 助手消息中的Markdown样式 */
+#ai-assistant-dialog .assistant-message p {
+    margin: 0.5em 0;
+}
+
+#ai-assistant-dialog .assistant-message code {
+    background-color: #f3f3f3;
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-family: monospace;
+    font-size: 0.9em;
+}
+
+#ai-assistant-dialog .assistant-message pre {
+    background-color: #f6f8fa;
+    padding: 12px;
+    border-radius: 6px;
+    overflow-x: auto;
+    margin: 0.5em 0;
+}
+
+#ai-assistant-dialog .assistant-message pre code {
+    background-color: transparent;
+    padding: 0;
+}
+
+#ai-assistant-dialog .assistant-message ul,
+#ai-assistant-dialog .assistant-message ol {
+    margin: 0.5em 0;
+    padding-left: 1.5em;
+}
+
+#ai-assistant-dialog .assistant-message blockquote {
+    border-left: 4px solid #ddd;
+    margin: 0.5em 0;
+    padding-left: 1em;
+    color: #666;
+}
+
+#ai-assistant-dialog .assistant-message a {
+    color: #0366d6;
+    text-decoration: none;
+}
+
+#ai-assistant-dialog .assistant-message a:hover {
+    text-decoration: underline;
+}
+
+#ai-assistant-dialog .assistant-message table {
+    border-collapse: collapse;
+    margin: 0.5em 0;
+    width: 100%;
+}
+
+#ai-assistant-dialog .assistant-message th,
+#ai-assistant-dialog .assistant-message td {
+    border: 1px solid #ddd;
+    padding: 6px 8px;
+}
+
+#ai-assistant-dialog .assistant-message th {
+    background-color: #f6f8fa;
+}
+
+/* 中断消息样式 */
+#ai-assistant-dialog .message.assistant-message[style*="text-align: center"] {
+    max-width: none;
+    margin: 4px 0;
+    opacity: 0.7;
+}
+
+/* 打字指示器 */
+#ai-assistant-dialog .typing-indicator {
+    display: inline-block;
+    padding: 4px 8px;
+}
+
+#ai-assistant-dialog .typing-indicator span {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background-color: #90909090;
+    border-radius: 50%;
+    margin: 0 2px;
+    animation: typing 1s infinite ease-in-out;
+}
+
+#ai-assistant-dialog .typing-indicator span:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+#ai-assistant-dialog .typing-indicator span:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes typing {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-4px);
+    }
+}
+
+/* ==================== 用户输入和交互样式 ==================== */
+
+/* 输入容器 */
+#ai-assistant-dialog .input-container {
+    position: relative;
+    display: flex;
+    gap: 8px;
+    padding: 12px;
+    background-color: white;
+    border-top: 1px solid #F3F4F6;
+    z-index: 2;
+}
+
+/* 输入框样式 */
+#ai-assistant-dialog textarea {
+    display: block;
+    width: 100%;
+    padding: 8px 12px;
+    padding-right: 44px;
+    border: 1px solid #E5E7EB;
+    border-radius: 18px;
+    resize: none;
+    font-family: inherit;
+    font-size: 14px;
+    line-height: 1.4;
+    background: #F9FAFB;
+    color: #333;
+    transition: all 0.2s ease;
+    min-height: 36px;
+    max-height: 120px;
+}
+
+#ai-assistant-dialog textarea:focus {
+    border-color: #007AFF;
+    outline: none;
+    background: white;
+}
+
+/* 发送按钮样式 */
+#ai-assistant-dialog #askButton {
+    position: absolute;
+    right: 24px;
+    bottom: 50%;
+    transform: translateY(50%);
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    min-height: 28px;
+    padding: 0;
+    margin: 0;
+    background: #007AFF;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 6px rgba(0, 122, 255, 0.2);
+    z-index: 1;
+}
+
+#ai-assistant-dialog #askButton::before {
+    content: "";
+    display: block;
+    width: 0;
+    height: 0;
+    border-style: solid;
+    border-width: 6px 0 6px 10px;
+    border-color: transparent transparent transparent white;
+    margin-left: 3px;
+    transition: all 0.2s ease;
+}
+
+#ai-assistant-dialog #askButton.generating::before {
+    content: "";
+    width: 10px;
+    height: 10px;
+    border: none;
+    background-color: white;
+    margin-left: 0;
+}
+
+#ai-assistant-dialog #askButton:hover {
+    background: #0056b3;
+    transform: translateY(50%) scale(1.05);
+    box-shadow: 0 4px 8px rgba(0, 122, 255, 0.3);
+}
+
+#ai-assistant-dialog #askButton:active {
+    transform: translateY(50%) scale(0.95);
+    box-shadow: 0 2px 4px rgba(0, 122, 255, 0.2);
+}
+
+#ai-assistant-dialog #askButton:disabled {
+    background: #E0E0E0;
+    cursor: not-allowed;
+    transform: translateY(50%);
+    box-shadow: none;
+}
+
+#ai-assistant-dialog #askButton:disabled::before {
+    border-color: transparent transparent transparent rgba(255, 255, 255, 0.6);
+}
+
+/* ==================== 悬浮球开关组件样式 ==================== */
+
+/* 开关容器 */
+#ai-assistant-dialog .toggle-ball {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#ai-assistant-dialog .toggle-label {
+    font-size: 14px;
+    color: #666;
+}
+
+/* 开关样式 */
+#ai-assistant-dialog .switch {
+    position: relative;
+    display: inline-block;
+    width: 40px;
+    height: 20px;
+}
+
+#ai-assistant-dialog .switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+#ai-assistant-dialog .switch .slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+    border-radius: 20px;
+}
+
+#ai-assistant-dialog .switch .slider:before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 2px;
+    bottom: 2px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+#ai-assistant-dialog .switch input:checked+.slider {
+    background-color: #007AFF;
+}
+
+#ai-assistant-dialog .switch input:checked+.slider:before {
+    transform: translateX(20px);
+}
+
+/* ==================== 悬浮球相关样式 ==================== */
+
+/* 悬浮球容器 */
+.ball-container {
+    position: fixed;
+    z-index: 9999;
+    width: 50px;
+    height: 50px;
+}
+
+/* 悬浮球主体 */
+#ai-assistant-ball {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #007AFF;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    z-index: 2147483646;
+    font-size: 24px;
+    color: white;
+    transition: transform 0.3s ease, background-color 0.3s ease;
+    user-select: none;
+    pointer-events: auto;
+}
+
+#ai-assistant-ball:hover {
+    transform: scale(1.1);
+    background-color: #0056b3;
+}
+
+/* 悬浮球边缘状态样式 */
+#ai-assistant-ball.edge-left {
+    transform: translateX(-50%);
+    left: 0;
+    transition: all 0.3s ease;
+}
+
+#ai-assistant-ball.edge-right {
+    transform: translateX(50%);
+    right: 0;
+    left: auto;
+    transition: all 0.3s ease;
+}
+
+#ai-assistant-ball.edge-top {
+    transform: translateY(-50%);
+    top: 0;
+    transition: all 0.3s ease;
+}
+
+#ai-assistant-ball.edge-bottom {
+    transform: translateY(50%);
+    bottom: 0;
+    top: auto;
+    transition: all 0.3s ease;
+}
+
+/* 悬浮时恢复完整大小 */
+#ai-assistant-ball.edge-left:hover {
+    transform: translateX(0);
+}
+
+#ai-assistant-ball.edge-right:hover {
+    transform: translateX(0);
+}
+
+#ai-assistant-ball.edge-top:hover {
+    transform: translateY(0);
+}
+
+#ai-assistant-ball.edge-bottom:hover {
+    transform: translateY(0);
+}
+
+/* 设置按钮样式 */
+.settings-button {
+    width: 32px;
+    height: 32px;
+    background-color: #007AFF;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    color: white;
+    font-size: 16px;
+    position: absolute;
+    left: 50%;
+    top: 100%;
+    margin-top: 8px;
+    transform: translateX(-50%) scale(0.8);
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ball-container:hover .settings-button {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(-50%) scale(1);
+}
+
+.settings-button:hover {
+    background-color: #0056b3;
+}
+
+/* 设置按钮位置调整 */
+.ball-container:has(#ai-assistant-ball.edge-bottom) .settings-button {
+    top: auto;
+    bottom: 100%;
+    margin-top: 0;
+    margin-bottom: 8px;
+}
+
+.ball-container:has(#ai-assistant-ball.edge-top) .settings-button,
+.ball-container:has(#ai-assistant-ball.edge-left) .settings-button,
+.ball-container:has(#ai-assistant-ball.edge-right) .settings-button {
+    top: 100%;
+    bottom: auto;
+    margin-bottom: 0;
+    margin-top: 8px;
+}
+
+/* ==================== 右键菜单样式 ==================== */
+
+/* 对话框右键菜单 */
+.context-menu {
+    position: fixed;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    padding: 4px 0;
+    z-index: 2147483647;
+    min-width: 150px;
+}
+
+.context-menu-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 14px;
+    color: #333;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.context-menu-item:hover {
+    background-color: #f5f5f5;
+}
+
+/* 悬浮球右键菜单 */
+.ball-context-menu {
+    position: fixed;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    padding: 4px 0;
+    z-index: 10000;
+    min-width: 100px;
+}
+
+.ball-context-menu-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 14px;
+    color: #333;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ball-context-menu-item:hover {
+    background-color: #f5f5f5;
+}
+
+/* ==================== 复制功能样式 ==================== */
+
+/* 复制成功提示 */
+.copy-toast {
+    position: fixed;
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-size: 14px;
+    z-index: 2147483647;
+    pointer-events: none;
+    animation: fadeInOut 2s ease;
+    white-space: nowrap;
+}
+
+@keyframes fadeInOut {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, -50%) translateY(10px);
+    }
+    20% {
+        opacity: 1;
+        transform: translate(-50%, -50%) translateY(0);
+    }
+    80% {
+        opacity: 1;
+        transform: translate(-50%, -50%) translateY(0);
+    }
+    100% {
+        opacity: 0;
+        transform: translate(-50%, -50%) translateY(-10px);
+    }
+}
+
+/* ==================== 滚动条和通用样式 ==================== */
+
+/* 自定义滚动条 */
+#ai-assistant-dialog ::-webkit-scrollbar {
+    width: 8px;
+}
+
+#ai-assistant-dialog ::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+#ai-assistant-dialog ::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+#ai-assistant-dialog ::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* ==================== 动画关键帧 ==================== */
+
+@keyframes slideIn {
+    from {
+        transform: scale(0.3);
+        opacity: 0;
+    }
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOut {
+    from {
+        transform: scale(1);
+        opacity: 1;
+    }
+    to {
+        transform: scale(0.3);
+        opacity: 0;
+    }
+}
+
+/* ==================== 其他辅助样式 ==================== */
+
+/* 确保对话框内容不会被遮挡 */
+#ai-assistant-dialog::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: -1;
+    pointer-events: none;
+}
+
+/* 悬浮球hover区域 */
+.ball-hover-area {
+    position: absolute;
+    width: 100px;
+    height: 100px;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+}
+
+/* 确保设置按钮可以接收点击事件 */
+.settings-button {
+    pointer-events: auto;
+}

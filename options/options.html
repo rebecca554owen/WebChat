@@ -9,53 +9,30 @@
 
 <body>
     <div class="container">
-        <h1>设置</h1>
-
         <div class="settings-section">
-            <h2>常规设置（立即生效）</h2>
-            <div class="setting-item">
-                <label class="setting-label">
-                    <input type="checkbox" id="autoHideDialog" checked>
-                    点击对话框外部时自动隐藏对话框
-                </label>
-            </div>
-            <div class="setting-item">
-                <label class="setting-label">
-                    <input type="checkbox" id="enableContext" checked>
-                    启用上下文聊天（包含历史对话记录）
-                </label>
-            </div>
-            <div id="contextSettings" class="sub-settings">
-                <div class="setting-item">
-                    <label for="maxContextRounds">保留最近对话轮数</label>
-                    <input type="number" id="maxContextRounds" min="1" max="10" value="3">
-                    <div class="help-text">设置保留最近几轮对话作为上下文（1-10轮），每轮包含一问一答</div>
-                </div>
-            </div>
-            <div class="setting-item">
-                <label for="systemPrompt">系统提示词</label>
-                <textarea id="systemPrompt" rows="3" placeholder="你是一个帮助理解网页内容的AI助手。请使用Markdown格式回复。"></textarea>
-                <div class="help-text">设置AI助手的角色和行为。留空则使用默认提示词。</div>
-            </div>
-        </div>
-
-        <div class="settings-section">
-            <h2>API 配置</h2>
-            <div class="form-group">
-                <label for="apiType">API类型:</label>
-                <select id="apiType">
-                    <option value="custom">自定义API</option>
-                    <option value="ollama">本地模型(Ollama)</option>
-                </select>
-            </div>
+            <h2>API设置</h2>
 
             <div id="apiSettings">
+                <div class="form-group">
+                    <label for="base_url">API地址 (base_url)<span class="required-mark">*</span></label>
+                    <input type="text" id="base_url" placeholder="">
+
+                    <div class="api-preview">
+                        <small>实时预览：<span id="apiHostPreview">请输入API地址</span></small>
+                        <small class="help-text">
+                            • 以 # 结尾：强制使用用户输入的API地址调用调用大模型 <br>
+                            • 以 / 结尾：忽略v1版本，补全 /chat/completions 调用 <br>
+                            • 其他情况：自动补全为 /v1/chat/completions 调用
+                        </small>
+                    </div>
+                </div>
+
                 <div class="form-group api-key-group">
-                    <label for="apiKey">API密钥: <span class="required-mark">*</span></label>
+                    <label for="api_key">API密钥 (api_key)<span class="required-mark">*</span></label>
                     <div class="input-wrapper">
-                        <input type="password" id="apiKey" placeholder="请输入API密钥" class="secure-input"
+                        <input type="password" id="api_key" placeholder="请输入API密钥" class="secure-input"
                             autocomplete="off" spellcheck="false">
-                        <button type="button" id="toggleApiKey" class="toggle-visibility" title="点击显示">
+                        <button type="button" id="toggle_api_key" class="toggle-visibility" title="点击显示">
                             <span class="eye-icon">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                                     <path
@@ -64,47 +41,73 @@
                             </span>
                         </button>
                     </div>
-                    <small class="help-text">使用自定义API时必填</small>
                 </div>
 
                 <div class="form-group">
-                    <label for="apiBase">请求URL: <span class="required-mark">*</span></label>
-                    <input type="text" id="apiBase" placeholder="">
-                    <small class="help-text" id="apiBaseHelp">API接口地址</small>
-                </div>
-
-                <div class="form-group">
-                    <label for="model">AI模型: <span class="required-mark">*</span></label>
+                    <label for="model">模型名称 (model)<span class="required-mark">*</span></label>
                     <input type="text" id="model" placeholder="">
-                    <small class="help-text" id="modelHelp">模型名称</small>
                 </div>
-            </div>
-            <div class="form-group">
-                <label for="maxTokens">最大回复长度:</label>
-                <div class="range-with-input">
-                    <input type="range" id="maxTokensRange" min="128" max="4096" value="2048" step="1">
-                    <input type="number" id="maxTokensInput" min="128" max="4096" value="2048">
+
+                <div class="form-group">
+                    <label for="system_prompt">系统提示词 (system_prompt)</label>
+                    <input type="text" id="system_prompt"
+                        placeholder="你是一个帮助理解网页内容的AI助手，请使用MD格式回复。">
+                    <div class="help-text">设置AI助手的角色和行为，留空则使用默认提示词。</div>
                 </div>
-                <small class="help-text">调整范围：128 ~ 4096 tokens</small>
             </div>
 
-            <div class="form-group">
-                <label for="temperature">温度 (创造性):</label>
-                <div class="range-with-input">
-                    <input type="range" id="temperatureRange" min="0" max="1" value="0.7" step="0.1">
-                    <input type="number" id="temperatureInput" min="0" max="1" value="0.7" step="0.1">
+            <h2>对话设置</h2>
+            <div class="setting-row">
+                <div class="setting-item-inline">
+                    <label class="setting-label">
+                        <input type="checkbox" id="autoHideDialog" checked>
+                        点击对话框外自动隐藏
+                    </label>
                 </div>
-                <small class="help-text">调整范围：0.0 ~ 1.0 (值越大，回答越具有创造性)</small>
+                <div class="setting-item-inline">
+                    <label class="setting-label">
+                        <input type="checkbox" id="enableContext" checked>
+                        开启对话历史记录功能
+                    </label>
+                </div>
+                <div class="setting-item-inline">
+                    <label class="setting-label">
+                        <input type="checkbox" id="stream" checked>
+                        启用流式输出 (stream)
+                    </label>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group-inline">
+                    <label for="temperature">创造性</label>
+                    <input type="number" id="temperature_input" min="0" max="1" value="0.6" step="0.1" class="number-only-input">
+                    <small class="help-text">0.0-1.0</small>
+                </div>
+
+                <div class="form-group-inline">
+                    <label for="max_tokens">最大回复长度</label>
+                    <input type="number" id="max_tokens_input" min="1024" max="8192" value="2048" class="number-only-input">
+                    <small class="help-text">1024-8192 tokens</small>
+                </div>
             </div>
         </div>
 
-        <div class="button-group">
-            <button id="reset" class="secondary-button">还原默认设置</button>
-            <button id="save">保存并测试</button>
+        <div class="form-actions">
+            <button type="button" id="reset" class="btn btn-danger">还原默认设置</button>
+            <button type="button" id="saveOnlyBtn" class="btn btn-secondary">仅保存</button>
+            <button type="button" id="saveAndTestBtn" class="btn btn-primary">保存并测试</button>
         </div>
 
-        <div id="status" class="status"></div>
     </div>
+    
+    <!-- 弹窗提示 -->
+    <div id="toast" class="toast">
+        <div class="toast-content">
+            <span id="toast-message"></span>
+            <button id="toast-close" class="toast-close">&times;</button>
+        </div>
+    </div>
+    
     <script src="options.js"></script>
 </body>
 

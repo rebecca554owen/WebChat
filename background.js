@@ -1,420 +1,535 @@
-// 存储会话历史的对象，键是标签ID
-let sessionHistories = {};
-// 存储生成状态的对象，键是标签ID
-let generatingStates = {};
-// 用于跟踪当前正在生成的答案
-let currentAnswers = {};
-// 存储活动端口的对象，键是标签ID
-let activePorts = {};
-// 存储已完成的答案，键是标签ID
-let completedAnswers = {};
+// WebChat AI助手 - Background Service Worker
+// 处理API调用、消息传递、历史记录管理等核心功能
 
-// 监听扩展安装事件
-chrome.runtime.onInstalled.addListener(() => {
-    console.log('扩展已安装');
-});
+// ==================== 配置常量 ====================
 
-// 处理来自popup的消息
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.action === 'saveHistory') {
-        // 保存会话历史
-        sessionHistories[request.tabId] = request.history;
-        sendResponse({ status: 'ok' });
-    } else if (request.action === 'getHistory') {
-        const history = sessionHistories[request.tabId] || [];
-        const state = generatingStates[request.tabId] || { isGenerating: false };
+const DEFAULT_SETTINGS = {
+    autoHideDialog: true,
+    base_url: 'https://api.freewife.online',
+    api_key: '',
+    model: 'deepseek-v3',
+    enableContext: true,
+    stream: true,
+    max_tokens: 2048,
+    temperature: 0.6,
+    system_prompt: '你是一个帮助理解网页内容的AI助手，请使用MD格式回复。'
+};
 
-        // 如果正在生成答案，确保返回的历史记录中包含用户问题
-        if (state.isGenerating && state.pendingQuestion) {
-            const lastMessage = history[history.length - 1];
-            if (!lastMessage || !lastMessage.isUser || lastMessage.content !== state.pendingQuestion) {
-                // 创建一个新的历史记录数组，包含用户问题
-                const updatedHistory = [...history, { content: state.pendingQuestion, isUser: true }];
-                sendResponse({
-                    history: updatedHistory,
-                    isGenerating: state.isGenerating,
-                    pendingQuestion: state.pendingQuestion,
-                    currentAnswer: currentAnswers[request.tabId] || ''
-                });
-                return true;
-            }
-        }
+// ==================== 全局变量 ====================
 
-        sendResponse({
-            history: history,
-            isGenerating: state.isGenerating,
-            pendingQuestion: state.pendingQuestion,
-            currentAnswer: currentAnswers[request.tabId] || ''
-        });
-    } else if (request.action === 'clearHistory') {
-        // 清除会话历史
-        delete sessionHistories[request.tabId];
-        delete generatingStates[request.tabId];
-        delete currentAnswers[request.tabId];
-        sendResponse({ status: 'ok' });
-    } else if (request.action === 'generateAnswer') {
-        // 开始生成答案
-        const state = generatingStates[request.tabId] || {};
-        if (!state.isGenerating) {
-            // 只有在没有生成进行中时才添加新的问题
-            handleAnswerGeneration(request.tabId, request.pageContent, request.question);
-            generatingStates[request.tabId] = {
-                isGenerating: true,
-                pendingQuestion: request.question
-            };
-        }
-        sendResponse({ status: 'started' });
-    } else if (request.action === 'getGeneratingState') {
-        // 获取生成状态
-        sendResponse(generatingStates[request.tabId] || { isGenerating: false });
-    } else if (request.action === 'openPopup') {
-        // 打开扩展的popup
-        chrome.action.openPopup();
-        sendResponse({ status: 'ok' });
-    } else if (request.action === 'getCurrentTab') {
-        // 返回发送消息的标签页ID
-        sendResponse({ tabId: sender.tab.id });
-    } else if (request.action === 'openOptions') {
-        // 打开选项页面
-        chrome.runtime.openOptionsPage();
-        sendResponse({ status: 'ok' });
+// 存储每个标签页的会话历史
+const tabHistories = new Map();
+
+// 存储当前生成状态
+const generationStates = new Map();
+
+// 存储活跃的端口连接
+const activePorts = new Map();
+
+// ==================== 工具函数 ====================
+
+// 格式化API地址
+function formatBaseUrl(base_url) {
+    if (!base_url) return '';
+    
+    base_url = base_url.trim();
+    
+    if (base_url.endsWith('#')) {
+        return base_url.slice(0, -1);
     }
-    return true;
-});
-
-// 修改background.js中的消息处理
-chrome.runtime.onConnect.addListener((port) => {
-    if (port.name === "answerStream") {
-        // 存储端口连接
-        port.onMessage.addListener(async (request) => {
-            const tabId = request.tabId;
-
-            if (request.action === 'generateAnswer') {
-                activePorts[tabId] = port;
-                try {
-                    await handleAnswerGeneration(port, tabId, request.pageContent, request.question);
-                } catch (error) {
-                    if (port === activePorts[tabId]) {
-                        port.postMessage({ type: 'error', error: error.message });
-                    }
-                }
-            } else if (request.action === 'reconnectStream') {
-                // 如果有已完成的答案，直接发送完成信号
-                if (completedAnswers[tabId]) {
-                    port.postMessage({
-                        type: 'answer-chunk',
-                        content: completedAnswers[tabId]
-                    });
-                    port.postMessage({ type: 'answer-end' });
-                    // 清理完成的答案
-                    delete completedAnswers[tabId];
-                } else if (currentAnswers[tabId]) {
-                    // 如果有正在生成的答案，发送当前进度并继续监听
-                    port.postMessage({
-                        type: 'answer-chunk',
-                        content: currentAnswers[tabId]
-                    });
-                    // 记录新的端口连接
-                    activePorts[tabId] = port;
-                } else if (generatingStates[tabId]?.isGenerating) {
-                    // 如果正在生成但还没有内容，只更新端口连接
-                    activePorts[tabId] = port;
-                } else {
-                    // 如果没有生成状态，发送完成信号
-                    port.postMessage({ type: 'answer-end' });
-                }
-            }
-        });
-
-        // 监听端口断开
-        port.onDisconnect.addListener(() => {
-            // 找到并移除断开的端口
-            for (const tabId in activePorts) {
-                if (activePorts[tabId] === port) {
-                    delete activePorts[tabId];
-                    break;
-                }
-            }
-        });
+    
+    if (base_url.endsWith('/')) {
+        return base_url + 'chat/completions';
     }
-});
+    
+    return base_url + '/v1/chat/completions';
+}
 
-// 监听设置变更
-chrome.storage.onChanged.addListener((changes, namespace) => {
-    if (namespace === 'sync') {
-        // 如果禁用了上下文，清除所有标签页的历史记录
-        if (changes.enableContext && !changes.enableContext.newValue) {
-            sessionHistories = {};
-        }
-        // 如果修改了系统提示词，立即生效
-        if (changes.systemPrompt) {
-            console.log('系统提示词已更新:', changes.systemPrompt.newValue);
-        }
-    }
-});
+// 解析网页内容
+function parseWebContent(content) {
+    if (!content) return '';
+    
+    return content
+        .replace(/\s+/g, ' ')
+        .replace(/\n\s*\n/g, '\n')
+        .trim()
+        .substring(0, 8000); // 限制长度
+}
 
-// 修改handleAnswerGeneration函数
-async function handleAnswerGeneration(port, tabId, pageContent, question) {
-    try {
-        // 在开始生成之前，先保存用户问题到历史记录
-        let chatHistory = sessionHistories[tabId] || [];
-        const lastMessage = chatHistory[chatHistory.length - 1];
-
-        // 只有当最后一条不是相同的用户消息时才添加
-        if (!lastMessage || !lastMessage.isUser || lastMessage.content !== question) {
-            sessionHistories[tabId] = chatHistory;
-        }
-
-        // 初始化当前答案
-        currentAnswers[tabId] = '';
-        completedAnswers[tabId] = null; // 重置已完成的答案
-
-        // 设置生成状态
-        generatingStates[tabId] = {
-            isGenerating: true,
-            pendingQuestion: question
-        };
-
-        // 获取最新的设置，确保获取到最新的系统提示词
-        const settings = await chrome.storage.sync.get({
-            apiType: 'custom',
-            maxTokens: 2048,
-            temperature: 0.7,
-            enableContext: true,
-            systemPrompt: '你是一个帮助理解网页内容的AI助手。请使用Markdown格式回复。',
-            custom_apiKey: '',
-            custom_apiBase: 'https://api.openai.com/v1/chat/completions',
-            custom_model: 'gpt-3.5-turbo',
-            ollama_apiKey: '',
-            ollama_apiBase: 'http://127.0.0.1:11434/api/chat',
-            ollama_model: 'qwen2.5'
-        });
-
-        // 获取当前API类型的配置
-        const apiKey = settings[`${settings.apiType}_apiKey`];
-        const apiBase = settings[`${settings.apiType}_apiBase`];
-        const model = settings[`${settings.apiType}_model`];
-
-        // 构建消息历史，使用最新的系统提示词
-        let messages = [
-            {
-                role: "system",
-                content: settings.systemPrompt // 使用最新的系统提示词
-            }
-        ];
-
-        // 如果启用了上下文，添加历史消息
-        if (settings.enableContext) {
-            const history = sessionHistories[tabId] || [];
-            // 只添加最近的几条消息作为上下文，避免超出token限制
-            const recentHistory = history.slice(-6); // 保留最近3轮对话（6条消息）
-            recentHistory.forEach(msg => {
-                messages.push({
-                    role: msg.isUser ? "user" : "assistant",
-                    content: msg.content
-                });
-            });
-        }
-
-        // 添加当前问题
+// 构建对话消息
+function buildMessages(settings, pageContent, question, history = []) {
+    const messages = [];
+    
+    // 添加系统提示
+    if (settings.system_prompt) {
         messages.push({
-            role: "user",
-            content: `基于以下网页内容回答问题：\n\n${pageContent}\n\n问题：${question}`
+            role: "system",
+            content: settings.system_prompt
         });
+    }
+    
+    // 添加网页内容上下文
+    if (pageContent) {
+        messages.push({
+            role: "system",
+            content: `当前网页内容：\n${pageContent}`
+        });
+    }
+    
+    // 添加历史对话（如果启用上下文）
+    if (settings.enableContext && history.length > 0) {
+        const maxRounds = 4;
+        const recentHistory = history.slice(-maxRounds * 2); // 每轮包含用户和助手消息
+        
+        recentHistory.forEach(msg => {
+            messages.push({
+                role: msg.isUser ? "user" : "assistant",
+                content: msg.content
+            });
+        });
+    }
+    
+    // 添加当前问题
+    messages.push({
+        role: "user",
+        content: question
+    });
+    
+    return messages;
+}
 
-        // 构建请求体
-        let requestBody;
-        if (settings.apiType === 'ollama') {
-            requestBody = {
-                model: model,
-                messages: messages,
-                stream: true,
-                options: {
-                    temperature: settings.temperature,
-                    num_predict: settings.maxTokens
-                }
-            };
-        } else {
-            requestBody = {
-                model: model,
-                messages: messages,
-                max_tokens: settings.maxTokens,
-                temperature: settings.temperature,
-                stream: true
-            };
-        }
+// ==================== API调用函数 ====================
 
-        let fullAnswer = ''; // 用于累积完整的答案
-
-        // 构建请求头
+// 调用AI API
+async function callAI(settings, messages, onChunk, onComplete, onError) {
+    try {
         const headers = {
             'Content-Type': 'application/json'
         };
-
-        // 如果是自定义API，添加Authorization头
-        if (settings.apiType === 'custom') {
-            headers['Authorization'] = `Bearer ${apiKey}`;
+        
+        if (settings.api_key) {
+            headers['Authorization'] = `Bearer ${settings.api_key}`;
         }
-
-        const response = await fetch(apiBase, {
+        
+        const requestBody = {
+            model: settings.model,
+            messages: messages,
+            max_tokens: settings.max_tokens,
+            temperature: settings.temperature,
+            stream: settings.stream !== false
+        };
+        
+        const response = await fetch(formatBaseUrl(settings.base_url), {
             method: 'POST',
-            headers: headers,
+            headers,
             body: JSON.stringify(requestBody)
         });
-
+        
         if (!response.ok) {
-            throw new Error('API请求失败');
-        }
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let accumulatedResponse = '';
-
-        // 估算输入tokens（简单实现，可以根据需要调整）
-        const systemPrompt = settings.systemPrompt;
-        const inputContent = `基于以下网页内容回答问题：\n\n${pageContent}\n\n问题：${question}`;
-        const inputTokens = Math.ceil((systemPrompt.length + inputContent.length) / 4);
-
-        // 发送输入tokens数量
-        if (port) {
+            const errorText = await response.text();
+            let errorMessage;
             try {
-                port.postMessage({
-                    type: 'input-tokens',
-                    tokens: inputTokens
-                });
-            } catch (portError) {
-                console.log('Port disconnected during input tokens sending');
+                const errorJson = JSON.parse(errorText);
+                errorMessage = errorJson.error?.message || '请求失败';
+            } catch (e) {
+                errorMessage = `请求失败: ${errorText}`;
             }
+            throw new Error(errorMessage);
         }
-
-        while (true) {
-            try {
-                const { done, value } = await reader.read();
-
-                // 检查端口是否已断开
-                if (!port) {
-                    console.log('Port disconnected, stopping generation');
-                    await reader.cancel();
-                    return;
-                }
-
-                if (done) break;
-
-                const chunk = decoder.decode(value);
-                const lines = chunk.split('\n');
-
-                for (const line of lines) {
-                    if (!line.trim()) continue;
-
-                    if (line.startsWith('data: ')) {
-                        const data = line.slice(5).trim();
-
-                        if (data === '[DONE]') {
-                            continue;
-                        }
-
-                        try {
-                            const parsed = JSON.parse(data);
-                            let content = '';
-
-                            if (settings.apiType === 'ollama') {
-                                content = parsed.message?.content || '';
-                            } else {
-                                content = parsed.choices?.[0]?.delta?.content || '';
-                            }
-
-                            if (content && port) { // 检查端口是否存在
-                                accumulatedResponse += content;
-                                try {
-                                    // 估算输出tokens数量
-                                    const outputTokens = Math.ceil(content.length / 4);
-                                    port.postMessage({
-                                        type: 'answer-chunk',
-                                        content: content,
-                                        markdownContent: accumulatedResponse,
-                                        tokens: outputTokens
-                                    });
-                                } catch (portError) {
-                                    console.log('Port disconnected during message sending');
-                                    await reader.cancel();
-                                    return;
-                                }
-                            }
-                        } catch (parseError) {
-                            console.warn('解析响应块时出错:', parseError, 'data:', data);
-                            continue;
-                        }
-                    }
-                }
-            } catch (streamError) {
-                console.error('Stream reading error:', streamError);
-                if (port) {
-                    try {
-                        port.postMessage({
-                            type: 'error',
-                            error: '读取响应流时出错'
-                        });
-                    } catch (portError) {
-                        console.log('Port disconnected during error sending');
-                    }
-                }
-                return;
+        
+        if (requestBody.stream) {
+            await handleStreamResponse(response, onChunk, onComplete, onError);
+        } else {
+            const data = await response.json();
+            if (data.error || !data.choices?.[0]?.message) {
+                throw new Error(data.error || '无效的API响应格式');
             }
+            const content = data.choices[0].message.content;
+            onChunk(content);
+            onComplete(content);
         }
-
-        // 发送完成消息
-        if (port) {
-            try {
-                port.postMessage({
-                    type: 'answer-end',
-                    markdownContent: accumulatedResponse
-                });
-
-                // 只有在启用上下文时才保存历史
-                if (settings.enableContext) {
-                    const history = sessionHistories[tabId] || [];
-                    history.push(
-                        { isUser: true, content: question, markdownContent: question },
-                        { isUser: false, content: accumulatedResponse, markdownContent: accumulatedResponse }
-                    );
-                    sessionHistories[tabId] = history;
-                }
-            } catch (portError) {
-                console.log('Port disconnected during final message sending');
-            }
-        }
-
+        
     } catch (error) {
-        console.error('生成回答时出错:', error);
-        if (port) {
-            try {
-                port.postMessage({
-                    type: 'error',
-                    error: error.message
-                });
-            } catch (portError) {
-                console.log('Port disconnected during error sending');
-            }
-        }
+        onError(error.message);
     }
 }
 
-// 监听标签页更新事件，清理相关的会话历史
-chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
-    if (changeInfo.status === 'loading') {
-        delete sessionHistories[tabId];
-        delete generatingStates[tabId];
-        delete currentAnswers[tabId];
-        delete activePorts[tabId];
-        delete completedAnswers[tabId];
+// 处理流式响应
+async function handleStreamResponse(response, onChunk, onComplete, onError) {
+    try {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let fullResponse = '';
+        
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            
+            const chunk = decoder.decode(value);
+            const lines = chunk.split('\n').filter(line => line.trim());
+            
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    const data = line.slice(5).trim();
+                    if (data === '[DONE]') {
+                        onComplete(fullResponse);
+                        return;
+                    }
+                    
+                    try {
+                        const parsed = JSON.parse(data);
+                        const content = parsed.choices?.[0]?.delta?.content || '';
+                        if (content) {
+                            fullResponse += content;
+                            onChunk(content);
+                        }
+                    } catch (e) {
+                        console.warn('解析流式响应失败:', e);
+                    }
+                }
+            }
+        }
+        
+        onComplete(fullResponse);
+    } catch (error) {
+        onError(error.message);
+    }
+}
+
+// ==================== 历史记录管理 ====================
+
+// 获取标签页历史记录
+function getTabHistory(tabId) {
+    return tabHistories.get(tabId) || [];
+}
+
+// 保存标签页历史记录
+function saveTabHistory(tabId, history) {
+    tabHistories.set(tabId, history);
+}
+
+// 添加消息到历史记录
+function addToHistory(tabId, content, isUser, markdownContent = null) {
+    const history = getTabHistory(tabId);
+    history.push({
+        content,
+        isUser,
+        markdownContent: markdownContent || content,
+        timestamp: Date.now()
+    });
+    saveTabHistory(tabId, history);
+}
+
+// 清空历史记录
+function clearTabHistory(tabId) {
+    tabHistories.delete(tabId);
+    generationStates.delete(tabId);
+}
+
+// ==================== 消息处理 ====================
+
+// 处理来自content script和popup的消息
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    try {
+        switch (request.action) {
+            case 'getCurrentTab':
+                handleGetCurrentTab(sendResponse);
+                break;
+                
+            case 'getHistory':
+                handleGetHistory(request, sendResponse);
+                break;
+                
+            case 'saveHistory':
+                handleSaveHistory(request, sendResponse);
+                break;
+                
+            case 'clearHistory':
+                handleClearHistory(request, sendResponse);
+                break;
+                
+            case 'openOptions':
+                handleOpenOptions(sendResponse);
+                break;
+                
+            default:
+                sendResponse({ error: '未知的操作类型' });
+        }
+    } catch (error) {
+        console.error('处理消息时出错:', error);
+        sendResponse({ error: error.message });
+    }
+    
+    return true; // 保持消息通道开放
+});
+
+// 处理获取当前标签页
+async function handleGetCurrentTab(sendResponse) {
+    try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        sendResponse({ tabId: tab?.id });
+    } catch (error) {
+        sendResponse({ error: '无法获取当前标签页' });
+    }
+}
+
+// 处理获取历史记录
+function handleGetHistory(request, sendResponse) {
+    const { tabId } = request;
+    const history = getTabHistory(tabId);
+    const generationState = generationStates.get(tabId);
+    
+    sendResponse({
+        history,
+        isGenerating: generationState?.isGenerating || false,
+        currentAnswer: generationState?.currentAnswer || '',
+        pendingQuestion: generationState?.pendingQuestion || ''
+    });
+}
+
+// 处理保存历史记录
+function handleSaveHistory(request, sendResponse) {
+    const { tabId, history } = request;
+    saveTabHistory(tabId, history);
+    sendResponse({ success: true });
+}
+
+// 处理清空历史记录
+function handleClearHistory(request, sendResponse) {
+    const { tabId } = request;
+    clearTabHistory(tabId);
+    sendResponse({ success: true });
+}
+
+// 处理打开选项页面
+function handleOpenOptions(sendResponse) {
+    chrome.runtime.openOptionsPage();
+    sendResponse({ success: true });
+}
+
+// ==================== 端口连接处理 ====================
+
+// 处理长连接
+chrome.runtime.onConnect.addListener((port) => {
+    if (port.name === "answerStream") {
+        handleAnswerStream(port);
     }
 });
 
-// 监听标签页关闭事件，清理相关的会话历史
+// 处理答案流
+function handleAnswerStream(port) {
+    port.onMessage.addListener(async (msg) => {
+        try {
+            switch (msg.action) {
+                case 'generateAnswer':
+                    await handleGenerateAnswer(msg, port);
+                    break;
+                    
+                case 'reconnectStream':
+                    handleReconnectStream(msg, port);
+                    break;
+                    
+                case 'stopGeneration':
+                    handleStopGeneration(msg, port);
+                    break;
+            }
+        } catch (error) {
+            console.error('处理端口消息时出错:', error);
+            port.postMessage({
+                type: 'error',
+                error: error.message
+            });
+        }
+    });
+    
+    port.onDisconnect.addListener(() => {
+        // 清理端口连接
+        for (const [tabId, portInfo] of activePorts.entries()) {
+            if (portInfo.port === port) {
+                activePorts.delete(tabId);
+                break;
+            }
+        }
+    });
+}
+
+// 处理生成答案
+async function handleGenerateAnswer(msg, port) {
+    const { tabId, pageContent, question } = msg;
+    
+    try {
+        // 获取设置
+        const settings = await chrome.storage.sync.get(DEFAULT_SETTINGS);
+        
+        // 验证设置
+        if (!settings.base_url?.trim()) {
+            throw new Error('请先在设置中配置API地址');
+        }
+        if (!settings.model?.trim()) {
+            throw new Error('请先在设置中配置AI模型');
+        }
+        
+        const isDefaultSettings = 
+            settings.base_url === DEFAULT_SETTINGS.base_url &&
+            settings.model === DEFAULT_SETTINGS.model;
+            
+        if (!settings.api_key?.trim() && !isDefaultSettings) {
+            throw new Error('请先在设置中配置API密钥');
+        }
+        
+        // 设置生成状态
+        generationStates.set(tabId, {
+            isGenerating: true,
+            currentAnswer: '',
+            pendingQuestion: question
+        });
+        
+        // 保存端口连接
+        activePorts.set(tabId, { port, tabId });
+        
+        // 添加用户问题到历史记录
+        addToHistory(tabId, question, true);
+        
+        // 获取历史记录
+        const history = getTabHistory(tabId);
+        
+        // 构建消息
+        const messages = buildMessages(settings, parseWebContent(pageContent), question, history.slice(0, -1));
+        
+        let fullAnswer = '';
+        
+        // 调用AI API
+        await callAI(
+            settings,
+            messages,
+            // onChunk
+            (chunk) => {
+                fullAnswer += chunk;
+                const state = generationStates.get(tabId);
+                if (state) {
+                    state.currentAnswer = fullAnswer;
+                }
+                
+                port.postMessage({
+                    type: 'answer-chunk',
+                    content: chunk
+                });
+            },
+            // onComplete
+            (finalAnswer) => {
+                // 添加完整答案到历史记录
+                addToHistory(tabId, finalAnswer, false, finalAnswer);
+                
+                // 清理生成状态
+                generationStates.delete(tabId);
+                activePorts.delete(tabId);
+                
+                port.postMessage({
+                    type: 'answer-end',
+                    content: finalAnswer
+                });
+            },
+            // onError
+            (error) => {
+                // 清理生成状态
+                generationStates.delete(tabId);
+                activePorts.delete(tabId);
+                
+                port.postMessage({
+                    type: 'error',
+                    error: error
+                });
+            }
+        );
+        
+    } catch (error) {
+        // 清理生成状态
+        generationStates.delete(tabId);
+        activePorts.delete(tabId);
+        
+        port.postMessage({
+            type: 'error',
+            error: error.message
+        });
+    }
+}
+
+// 处理重连流
+function handleReconnectStream(msg, port) {
+    const { tabId } = msg;
+    const state = generationStates.get(tabId);
+    
+    if (state && state.isGenerating) {
+        // 更新端口连接
+        activePorts.set(tabId, { port, tabId });
+        
+        // 发送当前已生成的内容
+        if (state.currentAnswer) {
+            port.postMessage({
+                type: 'answer-chunk',
+                content: state.currentAnswer
+            });
+        }
+    } else {
+        port.postMessage({
+            type: 'error',
+            error: '没有正在进行的生成任务'
+        });
+    }
+}
+
+// 处理停止生成
+function handleStopGeneration(msg, port) {
+    const { tabId } = msg;
+    
+    // 清理生成状态
+    generationStates.delete(tabId);
+    activePorts.delete(tabId);
+    
+    port.postMessage({
+        type: 'answer-end',
+        content: '生成已停止'
+    });
+}
+
+// ==================== 扩展生命周期 ====================
+
+// 扩展安装时的初始化
+chrome.runtime.onInstalled.addListener((details) => {
+    if (details.reason === 'install') {
+        // 首次安装时设置默认配置
+        chrome.storage.sync.set(DEFAULT_SETTINGS);
+        console.log('WebChat AI助手已安装');
+    } else if (details.reason === 'update') {
+        console.log('WebChat AI助手已更新');
+    }
+});
+
+// 标签页关闭时清理数据
 chrome.tabs.onRemoved.addListener((tabId) => {
-    delete sessionHistories[tabId];
-    delete generatingStates[tabId];
-    delete currentAnswers[tabId];
-    delete activePorts[tabId];
-    delete completedAnswers[tabId];
-}); 
+    clearTabHistory(tabId);
+});
+
+// 标签页更新时清理生成状态（但保留历史记录）
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+    if (changeInfo.status === 'loading') {
+        const state = generationStates.get(tabId);
+        if (state && state.isGenerating) {
+            generationStates.delete(tabId);
+            activePorts.delete(tabId);
+        }
+    }
+});
+
+// ==================== 错误处理 ====================
+
+// 全局错误处理
+self.addEventListener('error', (event) => {
+    console.error('Background script error:', event.error);
+});
+
+self.addEventListener('unhandledrejection', (event) => {
+    console.error('Unhandled promise rejection:', event.reason);
+});
+
+console.log('WebChat AI助手 Background Service Worker 已启动');
