@@ -1,37 +1,37 @@
+/**
+ * 解析网页内容，提取纯文本内容用于AI分析
+ * 移除脚本、样式、导航、页脚等非内容元素
+ * @returns {string} 清理后的网页文本内容
+ */
 function parseWebContent() {
-    // 克隆当前文档以供解析，不影响原始页面
     const docClone = document.cloneNode(true);
-
-    // 在克隆的文档中移除不需要的元素
     const scripts = docClone.querySelectorAll('script');
     const styles = docClone.querySelectorAll('style, link[rel="stylesheet"]');
     const headers = docClone.querySelectorAll('header, nav');
     const footers = docClone.querySelectorAll('footer');
-    // 移除WebChat对话窗口
     const chatDialog = docClone.querySelectorAll('#ai-assistant-dialog');
 
-    // 从克隆的文档中移除元素
     [...scripts, ...styles, ...headers, ...footers, ...chatDialog].forEach(element => {
         if (element.parentNode) {
             element.parentNode.removeChild(element);
         }
     });
 
-    // 获取主要内容（从body中提取）
     const mainContent = docClone.querySelector('body');
-
-    // 如果找到了body元素，获取其文本内容
     const textContent = mainContent ? mainContent.innerText : '';
 
-    // 清理文本
     return textContent
-        .replace(/\s+/g, ' ')  // 将多个空白字符替换为单个空格
-        .trim();               // 移除首尾空白
+        .replace(/\s+/g, ' ')
+        .trim();
 }
 
-// 创建对话框
+/**
+ * 创建AI助手对话框
+ * 包含标题栏、消息容器、输入框和调整大小手柄
+ * 支持拖拽移动和调整大小功能
+ * @returns {HTMLElement} 创建的对话框元素
+ */
 function createDialog() {
-    // 先移除可能存在的旧对话框
     const existingDialog = document.getElementById('ai-assistant-dialog');
     if (existingDialog) {
         existingDialog.remove();
@@ -39,11 +39,10 @@ function createDialog() {
 
     const dialog = document.createElement('div');
     dialog.id = 'ai-assistant-dialog';
-
-    // 复制popup.html的内容结构
     dialog.innerHTML = `
         <div class="container">
             <div class="header">
+                <div class="header-title">Web Chat</div>
             </div>
             <div id="chat-container" class="chat-container">
                 <div id="messages" class="messages"></div>
@@ -57,23 +56,19 @@ function createDialog() {
         <div class="resize-handle"></div>
     `;
 
-    // 添加拖动功能
     const container = dialog.querySelector('.container');
     const header = dialog.querySelector('.header');
 
-    // 声明拖动相关的变量
     let isDragging = false;
     let dragCurrentX;
     let dragCurrentY;
     let dragInitialX;
     let dragInitialY;
 
-    // 创建遮罩层
     const overlay = document.createElement('div');
     overlay.className = 'dialog-overlay';
     document.body.appendChild(overlay);
 
-    // 修改拖动相关代码
     header.addEventListener('mousedown', (e) => {
         if (e.target.closest('.toggle-ball')) return;
 
@@ -83,34 +78,28 @@ function createDialog() {
         dragInitialX = e.clientX - rect.left;
         dragInitialY = e.clientY - rect.top;
 
-        // 显示遮罩层
         overlay.classList.add('dragging');
     });
 
-    // 使用requestAnimationFrame优化拖动
     let dragAnimationFrame;
     document.addEventListener('mousemove', (e) => {
         if (isDragging) {
             e.preventDefault();
 
-            // 取消之前的动画帧
             if (dragAnimationFrame) {
                 cancelAnimationFrame(dragAnimationFrame);
             }
 
-            // 请求新的动画帧
             dragAnimationFrame = requestAnimationFrame(() => {
                 dragCurrentX = e.clientX - dragInitialX;
                 dragCurrentY = e.clientY - dragInitialY;
 
-                // 确保不会超出屏幕边界
                 const maxX = window.innerWidth - dialog.offsetWidth;
                 const maxY = window.innerHeight - dialog.offsetHeight;
 
                 dragCurrentX = Math.max(0, Math.min(dragCurrentX, maxX));
                 dragCurrentY = Math.max(0, Math.min(dragCurrentY, maxY));
 
-                // 直接设置left和top
                 dialog.style.left = `${dragCurrentX}px`;
                 dialog.style.top = `${dragCurrentY}px`;
             });
@@ -122,14 +111,12 @@ function createDialog() {
             isDragging = false;
             dialog.style.transition = '';
 
-            // 隐藏遮罩层
             overlay.classList.remove('dragging');
 
             if (dragAnimationFrame) {
                 cancelAnimationFrame(dragAnimationFrame);
             }
 
-            // 保存位置
             chrome.storage.sync.set({
                 dialogPosition: {
                     left: dialog.style.left,
@@ -139,7 +126,6 @@ function createDialog() {
         }
     });
 
-    // 从存储中加载对话框位置
     chrome.storage.sync.get({
         dialogPosition: {
             left: 'auto',
@@ -147,25 +133,22 @@ function createDialog() {
             isCustomPosition: false
         }
     }, (items) => {
-        // 只有当存在自定义位置时才应用
         if (items.dialogPosition.isCustomPosition) {
             dialog.style.left = items.dialogPosition.left;
             dialog.style.top = items.dialogPosition.top;
         }
     });
 
-    // 调整大小功能
     const resizeHandle = dialog.querySelector('.resize-handle');
 
     resizeHandle.addEventListener('mousedown', (e) => {
         isResizing = true;
-        dialog.style.transition = 'none'; // 禁用过渡动画
+        dialog.style.transition = 'none';
         resizeInitialWidth = dialog.offsetWidth;
         resizeInitialHeight = dialog.offsetHeight;
         resizeInitialX = e.clientX;
         resizeInitialY = e.clientY;
 
-        // 添加临时的全局事件监听器
         document.addEventListener('mousemove', handleResize);
         document.addEventListener('mouseup', stopResize);
 
@@ -173,17 +156,14 @@ function createDialog() {
         e.stopPropagation();
     });
 
-    // 使用requestAnimationFrame优化调整大小
     let resizeAnimationFrame;
     function handleResize(e) {
         if (!isResizing) return;
 
-        // 取消之前的动画帧
         if (resizeAnimationFrame) {
             cancelAnimationFrame(resizeAnimationFrame);
         }
 
-        // 请求新的动画帧
         resizeAnimationFrame = requestAnimationFrame(() => {
             const deltaX = e.clientX - resizeInitialX;
             const deltaY = e.clientY - resizeInitialY;
@@ -201,7 +181,6 @@ function createDialog() {
             dialog.style.width = `${finalWidth}px`;
             dialog.style.height = `${finalHeight}px`;
 
-            // 保存尺寸
             chrome.storage.sync.set({
                 dialogSize: {
                     width: finalWidth,
@@ -214,7 +193,7 @@ function createDialog() {
     function stopResize() {
         if (isResizing) {
             isResizing = false;
-            dialog.style.transition = ''; // 恢复过渡动画
+            dialog.style.transition = '';
             document.removeEventListener('mousemove', handleResize);
             document.removeEventListener('mouseup', stopResize);
 
@@ -224,7 +203,6 @@ function createDialog() {
         }
     }
 
-    // 从存储中加载对话框尺寸
     chrome.storage.sync.get({
         dialogSize: {
             width: 400,
@@ -237,21 +215,17 @@ function createDialog() {
 
     document.body.appendChild(dialog);
 
-    // 修改点击外部关闭功能
     document.addEventListener('mousedown', async (e) => {
         const ball = document.getElementById('ai-assistant-ball');
-        const contextMenu = document.querySelector('.context-menu');
 
-        // 获取自动隐藏设置
         const settings = await chrome.storage.sync.get({
-            autoHideDialog: true // 默认开启
+            autoHideDialog: true
         });
 
-        if (settings.autoHideDialog && // 检查设置
+        if (settings.autoHideDialog &&
             dialog.classList.contains('show') &&
             !dialog.contains(e.target) &&
-            (!ball || !ball.contains(e.target)) &&
-            (!contextMenu || !contextMenu.contains(e.target))) {
+            (!ball || !ball.contains(e.target))) {
             dialog.classList.remove('show');
         }
     });
@@ -259,13 +233,16 @@ function createDialog() {
     return dialog;
 }
 
-// 修改createFloatingBall函
+/**
+ * 创建悬浮球组件
+ * 包含主球体和设置按钮，支持拖拽移动和边缘吸附
+ * 点击球体可显示/隐藏对话框
+ * @returns {HTMLElement} 创建的悬浮球元素
+ */
 function createFloatingBall() {
-    // 创建容器
     const container = document.createElement('div');
     container.className = 'ball-container';
 
-    // 创建悬浮球
     const ball = document.createElement('div');
     ball.id = 'ai-assistant-ball';
     ball.innerHTML = `<svg t="1731757557572" class="icon" width="32" height="32" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1317" width="128" height="128">
@@ -274,61 +251,49 @@ function createFloatingBall() {
         <path d="M460.864 507.733333m-50.133333 0a50.133333 50.133333 0 1 0 100.266666 0 50.133333 50.133333 0 1 0-100.266666 0Z" p-id="1320" fill="white"></path>
     </svg>`;
 
-    // 创建设置按钮
     const settingsButton = document.createElement('div');
     settingsButton.className = 'settings-button';
     settingsButton.innerHTML = '<svg t="1731757768104" class="icon" width="24" height="24" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1612" width="128" height="128"><path d="M550.4 924.404h-49.1c-57.7 0-104.6-46.9-104.6-104.6-0.1-7.2-2.1-14.5-5.9-20.9-6.6-11.2-16.3-18.6-27.9-21.7-11.6-3.1-23.7-1.5-34.1 4.6-51.6 28.6-115.3 10.1-143.2-40.4l-24.5-42.2c-0.1-0.1-0.1-0.2-0.2-0.3v-0.1c-28.5-49.8-11.2-113.5 38.5-142 14-8.1 22.8-23.3 22.8-39.5s-8.7-31.4-22.9-39.6c-49.8-28.8-67-92.8-38.3-142.6l26.6-43.8c28.5-49.3 92.5-66.3 142.3-37.7 6.7 4 14.1 6 21.6 6.1h0.1c24.6 0 45.1-20.2 45.4-45.1 0-57.5 46.7-104.2 104-104.2h49.3c61 1.9 106.4 50.3 104.6 107.9 0.1 6.3 2.1 13.6 5.9 20 6.4 10.8 16.2 18.2 27.9 21.2s23.8 1.2 34.2-4.9c50-28.8 114.1-11.7 143 38l24.5 42.5 1.5 3c26.2 49.3 8.8 111.3-39.7 139.6-7.1 4-12.8 9.7-16.7 16.7-6.4 11.1-7.9 23.3-4.7 34.9 3.2 11.6 10.7 21.3 21.2 27.3 25 14.6 42.1 37.1 49.2 64 7.1 26.9 3.2 54.9-10.8 78.9l-26 43.5c-28.7 49.3-92.6 66.5-142.6 37.8-6.6-3.8-14.3-6-22.1-6.2-12 0.1-23.4 4.9-31.8 13.5-8.5 8.6-13.1 20-13 32-0.4 57.7-47.3 104.3-104.5 104.3z m-199.2-207.6c8.9 0 17.9 1.2 26.7 3.5 26.8 7.1 49.3 24.2 63.2 48.2 9.3 15.7 14.2 33.2 14.4 51 0 25.5 20.5 46 45.7 46h49.1c25 0 45.5-20.4 45.7-45.4-0.2-27.4 10.4-53.6 30-73.4 19.5-19.8 45.6-30.8 73.4-31 19.4 0.5 36.6 5.3 51.7 14 21.9 12.5 49.8 5 62.4-16.7l26.1-43.6c5.9-10.1 7.6-22.3 4.5-34-3.1-11.7-10.5-21.4-20.9-27.5-24.6-14-42-36.4-49.3-63.2-7.3-26.8-3.8-54.9 10-79 9.6-16.8 22.9-30.1 38.9-39.2 21.3-12.4 28.8-40.3 16.5-62-0.5-0.8-0.8-1.6-1.2-2.4l-23.2-40.2c-12.5-21.6-40.5-29.2-62.2-16.7-23.6 14-51.6 17.9-78.5 11.1-26.9-6.9-49.5-23.9-63.7-47.8-9.3-15.7-14.2-33.2-14.4-51.1 0.8-26.4-19-47.5-44.2-48.3h-50.8c-24.9 0-45.1 20.3-45.1 45.2-0.8 57.8-47.7 104.1-104.6 104.1h-0.2c-18.1-0.2-35.5-5.1-50.9-14.2-21.5-12.4-49.4-4.8-62 16.9l-26.6 43.7c-12.1 21.1-4.6 49.1 17.1 61.7 32.2 18.6 52.3 53.3 52.3 90.6s-20.1 72-52.3 90.6c-21.7 12.4-29.2 40.1-16.8 61.7 0 0.1 0.1 0.1 0.1 0.2l24.8 42.8c12.5 22.6 40.3 30.6 62.4 18.5 16-9.3 33.8-14.1 51.9-14.1zM525.9 650.204c-73.3 0-133-59.7-133-133s59.7-133 133-133 133 59.7 133 133c0 73.4-59.7 133-133 133z m0-207c-40.8 0-74.1 33.2-74.1 74.1s33.2 74.1 74.1 74.1 74.1-33.2 74.1-74.1-33.3-74.1-74.1-74.1z" p-id="1613" fill="#ffffff"></path></svg>';
     settingsButton.title = '设置';
 
-    // 创建对话框（如果不存在）
     let dialog = document.getElementById('ai-assistant-dialog');
     if (!dialog) {
         dialog = createDialog();
-        // 初始化对话框内容（只初始化一次）
         initializeDialog(dialog);
     }
 
-    // 设置按钮点击事件
     settingsButton.addEventListener('click', (e) => {
-        e.stopPropagation(); // 防止触发悬浮球的点击事件
+        e.stopPropagation();
         chrome.runtime.sendMessage({ action: 'openOptions' });
     });
 
-    // 悬浮球点击事件
     ball.addEventListener('click', () => {
         const isVisible = dialog.classList.contains('show');
         if (!isVisible) {
-            // 计算对话框的理想位置
             const ballRect = ball.getBoundingClientRect();
             const windowWidth = window.innerWidth;
             const windowHeight = window.innerHeight;
-            const dialogWidth = dialog.offsetWidth || 400; // 使用当前宽度或默认值
-            const dialogHeight = dialog.offsetHeight || 500; // 使用当前高度或默认值
+            const dialogWidth = dialog.offsetWidth || 400;
+            const dialogHeight = dialog.offsetHeight || 500;
 
-            // 默认尝试将对话框放在悬浮球的左侧
-            let left = ballRect.left - dialogWidth - 20; // 20px作为间距
+            let left = ballRect.left - dialogWidth - 20;
             let top = Math.min(
                 ballRect.top,
                 windowHeight - dialogHeight - 20
             );
 
-            // 如果左侧放不下，尝试放在右侧
             if (left < 20) {
                 left = ballRect.right + 20;
 
-                // 如果右侧也放不下，放在屏幕中央，但要避免被悬浮球遮挡
                 if (left + dialogWidth > windowWidth - 20) {
-                    // 如果悬浮球在右半部分，对话框放在左半部分
                     if (ballRect.left > windowWidth / 2) {
                         left = 20;
                     } else {
-                        // 否则放在右半部分
                         left = windowWidth - dialogWidth - 20;
                     }
                 }
             }
 
-            // 确保顶部有足够空间，否则将对话框放在下方
             if (top < 20) {
                 top = Math.min(
                     ballRect.bottom + 20,
@@ -336,29 +301,23 @@ function createFloatingBall() {
                 );
             }
 
-            // 最终的边界检查
             left = Math.max(20, Math.min(left, windowWidth - dialogWidth - 20));
             top = Math.max(20, Math.min(top, windowHeight - dialogHeight - 20));
 
-            // 应用位置
             dialog.style.left = `${left}px`;
             dialog.style.top = `${top}px`;
             dialog.style.right = 'auto';
             dialog.style.bottom = 'auto';
 
-            // 显示对话框
             dialog.classList.add('show');
         } else {
-            // 隐藏对话框时不改变位置
             dialog.classList.remove('show');
         }
     });
 
-    // 将悬浮球和设置按钮添加到容器中
     container.appendChild(ball);
     container.appendChild(settingsButton);
 
-    // 修改拖拽功能
     let isDragging = false;
     let currentX;
     let currentY;
@@ -378,15 +337,12 @@ function createFloatingBall() {
             currentX = e.clientX - initialX;
             currentY = e.clientY - initialY;
 
-            // 确保不会超出屏幕边界
             const maxX = window.innerWidth - container.offsetWidth;
             const maxY = window.innerHeight - container.offsetHeight;
             const edgeThreshold = ball.offsetWidth / 2;
 
-            // 移除所有边缘类
             ball.classList.remove('edge-left', 'edge-right', 'edge-top', 'edge-bottom');
 
-            // 检查是否靠近边缘并添加相应的类
             let position = {};
             if (currentX <= edgeThreshold) {
                 currentX = 0;
@@ -438,10 +394,8 @@ function createFloatingBall() {
                 };
             }
 
-            // 应用位置到容器
             Object.assign(container.style, position);
 
-            // 保存位置和边缘状态到存储
             chrome.storage.sync.set({
                 ballPosition: position
             });
@@ -452,25 +406,20 @@ function createFloatingBall() {
         isDragging = false;
     });
 
-    // 从存储中加载位置，并确保位置在可视区域内
     chrome.storage.sync.get({
         ballPosition: { right: '20px', bottom: '20px', left: 'auto', top: 'auto', edge: null }
     }, (items) => {
-        // 获取容器和窗口尺寸
         const containerRect = container.getBoundingClientRect();
         const windowWidth = window.innerWidth;
         const windowHeight = window.innerHeight;
 
-        // 解析保存的位置值
         let position = items.ballPosition;
         let left = position.left !== 'auto' ? parseInt(position.left) : null;
         let right = position.right !== 'auto' ? parseInt(position.right) : null;
         let top = position.top !== 'auto' ? parseInt(position.top) : null;
         let bottom = position.bottom !== 'auto' ? parseInt(position.bottom) : null;
 
-        // 确保位置在可视区域内
         if (left !== null) {
-            // 如果使用left定位
             left = Math.min(Math.max(0, left), windowWidth - containerRect.width);
             position = {
                 left: `${left}px`,
@@ -480,7 +429,6 @@ function createFloatingBall() {
                 edge: position.edge
             };
         } else if (right !== null) {
-            // 如果使用right定位
             right = Math.min(Math.max(0, right), windowWidth - containerRect.width);
             position = {
                 right: `${right}px`,
@@ -492,7 +440,6 @@ function createFloatingBall() {
         }
 
         if (top !== null) {
-            // 如果使用top定
             top = Math.min(Math.max(0, top), windowHeight - containerRect.height);
             position = {
                 ...position,
@@ -500,7 +447,6 @@ function createFloatingBall() {
                 bottom: 'auto'
             };
         } else if (bottom !== null) {
-            // 如果使用bottom定位
             bottom = Math.min(Math.max(0, bottom), windowHeight - containerRect.height);
             position = {
                 ...position,
@@ -509,30 +455,22 @@ function createFloatingBall() {
             };
         }
 
-        // 应用位置
         Object.assign(container.style, position);
 
-        // 如果有边缘状态，添加相应的类
         if (position.edge) {
             ball.classList.add(`edge-${position.edge}`);
         }
 
-        // 保存调整后的位置
         chrome.storage.sync.set({ ballPosition: position });
     });
 
-    // 添加窗口大小变化监听器
     window.addEventListener('resize', () => {
-        // 获取当前位置
         const rect = container.getBoundingClientRect();
         const windowWidth = window.innerWidth;
         const windowHeight = window.innerHeight;
 
-        // 确保位置在可视区内
         let left = rect.left;
         let top = rect.top;
-
-        // 调整位置
         if (left + rect.width > windowWidth) {
             left = windowWidth - rect.width;
         }
@@ -540,25 +478,21 @@ function createFloatingBall() {
             top = windowHeight - rect.height;
         }
 
-        // 确保不会小于0
         left = Math.max(0, left);
         top = Math.max(0, top);
 
-        // 应用新位置
         const position = {
             left: `${left}px`,
             top: `${top}px`,
             right: 'auto',
             bottom: 'auto',
-            edge: null // 重置边缘状态
+            edge: null
         };
 
         Object.assign(container.style, position);
 
-        // 保存新位置
         chrome.storage.sync.set({ ballPosition: position });
 
-        // 检查是否需要添加边缘类
         const edgeThreshold = ball.offsetWidth / 2;
         ball.classList.remove('edge-left', 'edge-right', 'edge-top', 'edge-bottom');
 
@@ -578,7 +512,6 @@ function createFloatingBall() {
             position.edge = 'bottom';
         }
 
-        // 保存更新后的位置和边缘状态
         chrome.storage.sync.set({ ballPosition: position });
     });
 
@@ -586,16 +519,17 @@ function createFloatingBall() {
     return ball;
 }
 
-// 存储对话框和悬浮球的引用
-let dialogInstance = null;
-let ballInstance = null;
-
-// 初始化marked
+// 全局变量声明
+let dialogInstance = null;  // 对话框实例
+let ballInstance = null;    // 悬浮球实例
+/**
+ * 初始化Marked.js库用于Markdown渲染
+ * 等待库加载完成并配置渲染选项
+ * @returns {Function} Markdown解析函数，失败时返回原文本函数
+ */
 async function initMarked() {
     try {
-        // 等待marked加载完成
         if (typeof marked === 'undefined') {
-            // 如果marked还没有加载，等它加载完成
             await new Promise((resolve, reject) => {
                 const checkMarked = () => {
                     if (typeof marked !== 'undefined') {
@@ -605,29 +539,30 @@ async function initMarked() {
                     }
                 };
                 checkMarked();
-                // 设置超时
-                setTimeout(() => reject(new Error('Marked加超时')), 5000);
+                setTimeout(() => reject(new Error('Marked加载超时')), 5000);
             });
         }
 
-        // 配置marked选项
         marked.setOptions({
-            breaks: true,      // 将换行符转换为<br>
-            gfm: true,         // 启用GitHub格的Markdown
-            headerIds: false,  // 禁用标题ID以避免潜在的冲突
-            mangle: false      // 禁用标题ID转义
+            breaks: true,
+            gfm: true,
+            headerIds: false,
+            mangle: false
         });
 
         return marked.parse;
     } catch (error) {
-        console.error('Marked初化失败:', error);
-        return text => text; // 提供一个后备方案
+        console.error('Marked初始化失败:', error);
+        return text => text;
     }
 }
 
-// 修改错误处理和通知显示函数
+/**
+ * 显示页面右上角通知消息
+ * 自动移除已存在的通知，显示新通知3秒后自动消失
+ * @param {string} message - 要显示的通知消息
+ */
 function showNotification(message) {
-    // 移除可能存在的旧通知
     const existingNotification = document.querySelector('.extension-notification');
     if (existingNotification) {
         existingNotification.remove();
@@ -651,15 +586,20 @@ function showNotification(message) {
     notification.textContent = message;
     document.body.appendChild(notification);
 
-    // 3秒后自动移除
     setTimeout(() => {
         notification.remove();
     }, 3000);
 }
 
-// 修改sendMessageWithRetry函数
+/**
+ * 带重试机制的消息发送函数
+ * 处理扩展上下文失效等错误情况，支持指数退避重试
+ * @param {Object} message - 要发送的消息对象
+ * @param {number} maxRetries - 最大重试次数，默认3次
+ * @returns {Promise} 发送结果或undefined（扩展失效时）
+ */
 async function sendMessageWithRetry(message, maxRetries = 3) {
-    let notificationShown = false; // 添加标记，避免重复显示通知
+    let notificationShown = false;
 
     for (let i = 0; i < maxRetries; i++) {
         try {
@@ -668,7 +608,6 @@ async function sendMessageWithRetry(message, maxRetries = 3) {
             if (error.message.includes('Extension context invalidated')) {
                 if (!notificationShown) {
                     console.log('Extension context invalidated, reloading page...');
-                    // 显示通知
                     const notification = document.createElement('div');
                     notification.style.cssText = `
                         position: fixed;
@@ -685,12 +624,11 @@ async function sendMessageWithRetry(message, maxRetries = 3) {
                     notification.textContent = '扩展已更新，请刷新页面以继续使用';
                     document.body.appendChild(notification);
 
-                    // 3秒后自动移除提示
                     setTimeout(() => {
                         notification.remove();
                     }, 3000);
 
-                    notificationShown = true; // 标记通知已显示
+                    notificationShown = true;
                 }
                 return;
             }
@@ -700,22 +638,25 @@ async function sendMessageWithRetry(message, maxRetries = 3) {
     }
 }
 
-// 移除全局错误监听器中的通知显示
+// 全局错误处理 - 防止扩展上下文失效错误显示给用户
 window.addEventListener('error', (event) => {
     if (event.error && event.error.message.includes('Extension context invalidated')) {
-        event.preventDefault(); // 阻止错误继续传播
+        event.preventDefault();
     }
 });
 
-// 移除未处理Promise错误监听器中的通知显示
+// 处理未捕获的Promise拒绝
 window.addEventListener('unhandledrejection', (event) => {
     if (event.reason && event.reason.message &&
         event.reason.message.includes('Extension context invalidated')) {
-        event.preventDefault(); // 阻止错误继续传播
+        event.preventDefault();
     }
 });
 
-// 修改checkAndSetBallVisibility函数
+/**
+ * 检查并设置悬浮球和对话框的可见性
+ * 确保UI组件正确初始化，处理扩展上下文失效情况
+ */
 async function checkAndSetBallVisibility() {
     try {
         if (!chrome.runtime) {
@@ -738,7 +679,10 @@ async function checkAndSetBallVisibility() {
     }
 }
 
-// 监听来自popup的消息
+/**
+ * Chrome扩展消息监听器
+ * 处理来自background script的各种消息请求
+ */
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     try {
         if (request.action === 'ping') {
@@ -757,10 +701,27 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
 });
 
-// 初始化时检查悬浮球状态
+/**
+ * 页面导航检测和初始化
+ * 检测页面导航类型，清空历史记录以确保不同网页的初始状态一致
+ */
+const navigationEntries = performance.getEntriesByType('navigation');
+if (navigationEntries.length > 0) {
+    const navigationType = navigationEntries[0].type;
+    // 对于reload、navigate类型都清空历史记录，确保不同网页初始状态一致
+    if (navigationType === 'reload' || navigationType === 'navigate') {
+        chrome.runtime.sendMessage({ action: 'clearCurrentTabHistory' });
+    }
+}
+
+// 初始化悬浮球和对话框
 checkAndSetBallVisibility();
 
-// 修改initializeDialog函数
+/**
+ * 初始化对话框功能
+ * 设置消息处理、滚动控制、历史记录加载等核心功能
+ * @param {HTMLElement} dialog - 对话框DOM元素
+ */
 async function initializeDialog(dialog) {
     try {
         const userInput = dialog.querySelector('#userInput');
@@ -772,41 +733,18 @@ async function initializeDialog(dialog) {
         let currentAnswer = '';
         let userHasScrolled = false;
 
-        // 创建并添加滚动按钮
-        const scrollToBottomButton = createScrollToBottomButton(messagesContainer);
-        chatContainer.appendChild(scrollToBottomButton);
-
-        // 监听滚动事件
-        messagesContainer.addEventListener('scroll', () => {
-            // 计算是否滚动到底部（添加一个小的容差值）
-            const isAtBottom = Math.abs(
-                messagesContainer.scrollHeight -
-                messagesContainer.clientHeight -
-                messagesContainer.scrollTop
-            ) < 30;
-
-            // 更新按钮显示状态
-            if (!isAtBottom) {
-                userHasScrolled = true;
-                scrollToBottomButton.style.display = 'block';
-            } else {
-                userHasScrolled = false;
-                scrollToBottomButton.style.display = 'none';
-            }
-        });
-
-        // 修改autoScroll函数
+        /**
+         * 自动滚动到消息容器底部
+         * 只在用户未手动滚动或强制滚动时执行
+         * @param {boolean} force - 是否强制滚动，忽略用户滚动状态
+         */
         function autoScroll(force = false) {
             const messagesContainer = document.querySelector('#ai-assistant-dialog .messages');
             if (!messagesContainer) return;
 
-            // 如果强制滚动或者用户没有手动滚动
             if (force || !userHasScrolled) {
-                // 使用requestAnimationFrame确保在DOM更新后滚动
                 requestAnimationFrame(() => {
-                    // 再次使用requestAnimationFrame以确保渲染完成
                     requestAnimationFrame(() => {
-                        // 使用scrollIntoView来确保最新消息可见
                         const messages = messagesContainer.children;
                         if (messages.length > 0) {
                             const lastMessage = messages[messages.length - 1];
@@ -817,9 +755,7 @@ async function initializeDialog(dialog) {
             }
         }
 
-        // 修改监听滚动事件的逻辑
         messagesContainer.addEventListener('scroll', () => {
-            // 只有在不生成答案时才检测用户滚动
             if (!isGenerating) {
                 const isAtBottom = Math.abs(
                     messagesContainer.scrollHeight -
@@ -831,7 +767,6 @@ async function initializeDialog(dialog) {
             }
         });
 
-        // 监听消息容器的容化
         const observer = new MutationObserver((mutations) => {
             let shouldScroll = false;
             for (const mutation of mutations) {
@@ -851,7 +786,6 @@ async function initializeDialog(dialog) {
             characterData: true
         });
 
-        // 对话框显示监听
         const dialogObserver = new MutationObserver((mutations) => {
             mutations.forEach((mutation) => {
                 if (mutation.target.classList.contains('show')) {
@@ -866,7 +800,6 @@ async function initializeDialog(dialog) {
             attributeFilter: ['class']
         });
 
-        // 获取标签页ID
         let tabId;
         try {
             const response = await sendMessageWithRetry({ action: 'getCurrentTab' });
@@ -879,7 +812,10 @@ async function initializeDialog(dialog) {
 
         const markedInstance = await initMarked();
 
-        // 加载历史
+        /**
+         * 加载当前标签页的聊天历史记录
+         * 如果没有历史记录则显示欢迎消息
+         */
         async function loadHistory() {
             try {
                 const response = await sendMessageWithRetry({ action: 'getHistory', tabId });
@@ -898,9 +834,6 @@ async function initializeDialog(dialog) {
 
                         try {
                             messageDiv.innerHTML = markedInstance(msg.markdownContent || msg.content);
-                            messageDiv.addEventListener('contextmenu', (e) => {
-                                handleContextMenu(e, messageDiv, messageDiv.dataset.markdownContent);
-                            });
                         } catch (error) {
                             console.error('Markdown渲染失败:', error);
                             messageDiv.textContent = msg.content;
@@ -916,63 +849,13 @@ async function initializeDialog(dialog) {
             }
         }
 
-        // 复制到剪贴板
-        async function copyToClipboard(text) {
-            try {
-                await navigator.clipboard.writeText(text);
-                return true;
-            } catch (err) {
-                console.error('复制失败:', err);
-                return false;
-            }
-        }
-
-        // 右键菜单
-        function handleContextMenu(e, messageDiv, content) {
-            e.preventDefault();
-            e.stopPropagation();
-
-            const oldMenu = document.querySelector('.context-menu');
-            if (oldMenu) oldMenu.remove();
-
-            const textToCopy = messageDiv.classList.contains('assistant-message')
-                ? messageDiv.dataset.markdownContent || content || messageDiv.textContent
-                : content;
-
-            const menu = document.createElement('div');
-            menu.className = 'context-menu';
-            menu.style.cssText = `position: fixed; left: ${e.clientX}px; top: ${e.clientY}px;`;
-
-            const copyOption = document.createElement('div');
-            copyOption.className = 'context-menu-item';
-            copyOption.innerHTML = '📋 复制该消息';
-            copyOption.onclick = async (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const success = await copyToClipboard(textToCopy);
-                if (success) {
-                    const toast = document.createElement('div');
-                    toast.className = 'copy-toast';
-                    toast.textContent = '✓ 已复制';
-                    toast.style.cssText = `position: fixed; left: ${e.clientX}px; top: ${e.clientY - 40}px; transform: translate(-50%, -50%);`;
-                    document.body.appendChild(toast);
-                    setTimeout(() => toast.remove(), 2000);
-                }
-                menu.remove();
-            };
-            menu.appendChild(copyOption);
-            document.body.appendChild(menu);
-
-            const closeMenu = (event) => {
-                if (!menu.contains(event.target)) {
-                    menu.remove();
-                    document.removeEventListener('mousedown', closeMenu);
-                }
-            };
-            document.addEventListener('mousedown', closeMenu);
-        }
-
-        // 添加消息
+        /**
+         * 添加消息到聊天容器
+         * 支持用户消息和AI回复，自动处理Markdown渲染
+         * @param {string} content - 消息内容
+         * @param {boolean} isUser - 是否为用户消息
+         * @returns {HTMLElement} 创建的消息元素
+         */
         function addMessage(content, isUser = false) {
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${isUser ? 'user-message' : 'assistant-message'}`;
@@ -983,9 +866,6 @@ async function initializeDialog(dialog) {
                 messageDiv.dataset.markdownContent = content;
                 try {
                     messageDiv.innerHTML = markedInstance(content);
-                    messageDiv.addEventListener('contextmenu', (e) => {
-                        handleContextMenu(e, messageDiv, messageDiv.dataset.markdownContent);
-                    });
                 } catch (error) {
                     console.error('Markdown渲染失败:', error);
                     messageDiv.textContent = content;
@@ -997,7 +877,10 @@ async function initializeDialog(dialog) {
             return messageDiv;
         }
 
-        // 打字指示器
+        /**
+         * 添加AI正在输入的动画指示器
+         * @returns {HTMLElement} 创建的打字指示器元素
+         */
         function addTypingIndicator() {
             const indicatorDiv = document.createElement('div');
             indicatorDiv.className = 'message assistant-message typing-indicator';
@@ -1007,7 +890,10 @@ async function initializeDialog(dialog) {
             return indicatorDiv;
         }
 
-        // 处理用户输入
+        /**
+         * 处理用户输入和AI回复生成
+         * 支持停止正在进行的生成，处理流式回复
+         */
         async function handleUserInput() {
             if (isGenerating) {
                 if (currentPort) {
@@ -1022,10 +908,18 @@ async function initializeDialog(dialog) {
 
                 const pendingMessage = document.querySelector('.message[data-pending="true"]');
                 const typingIndicator = document.querySelector('.typing-indicator');
-                if (pendingMessage) pendingMessage.remove();
+                
+                // 保留当前已生成的内容，只移除pending状态和打字指示器
+                if (pendingMessage) {
+                    pendingMessage.removeAttribute('data-pending');
+                    // 如果消息有内容，则保留；如果没有内容，则移除
+                    if (!pendingMessage.textContent.trim()) {
+                        pendingMessage.remove();
+                        addMessage('已停止回复', false);
+                    }
+                }
                 if (typingIndicator) typingIndicator.remove();
 
-                addMessage('已停止回复', false);
                 return;
             }
 
@@ -1062,9 +956,6 @@ async function initializeDialog(dialog) {
                         } else if (msg.type === 'answer-end') {
                             messageDiv.removeAttribute('data-pending');
                             messageDiv.dataset.markdownContent = msg.markdownContent || currentAnswer;
-                            messageDiv.addEventListener('contextmenu', (e) => {
-                                handleContextMenu(e, messageDiv, messageDiv.dataset.markdownContent);
-                            });
 
                             isGenerating = false;
                             userInput.disabled = false;
@@ -1115,7 +1006,6 @@ async function initializeDialog(dialog) {
             }
         }
 
-        // 绑定事件
         askButton.addEventListener('click', handleUserInput);
         userInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
@@ -1129,8 +1019,6 @@ async function initializeDialog(dialog) {
             userInput.style.height = Math.min(userInput.scrollHeight, 100) + 'px';
         });
 
-
-
         await loadHistory();
     } catch (error) {
         console.error('初始化对话框失败:', error);
@@ -1141,26 +1029,10 @@ async function initializeDialog(dialog) {
     }
 }
 
-// 创建滚动到底部按钮
-function createScrollToBottomButton(messagesContainer) {
-    const button = document.createElement('button');
-    button.className = 'scroll-to-bottom-button';
-    button.innerHTML = '↓ 回到当前消息';
-    button.style.display = 'none';
-
-    button.addEventListener('click', () => {
-        messagesContainer.scrollTo({
-            top: messagesContainer.scrollHeight,
-            behavior: 'smooth'
-        });
-        userHasScrolled = false;
-        button.style.display = 'none';
-    });
-
-    return button;
-}
-
-// 错误恢复
+/**
+ * 最终错误处理 - 显示用户友好的错误提示
+ * 当扩展上下文失效时提醒用户刷新页面
+ */
 window.addEventListener('error', (event) => {
     if (event.error && event.error.message.includes('Extension context invalidated')) {
         showNotification('扩展已更新，请刷新页面以继续使用');

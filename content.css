@@ -1,11 +1,17 @@
 /* AI助手扩展样式 */
 
-/* 悬浮球容器 */
+/* ========================================
+ * 悬浮球组件样式
+ * DOM结构: .ball-container > #ai-assistant-ball + .settings-button
+ * 功能: 可拖拽的悬浮球，支持边缘吸附效果
+ * ======================================== */
+
+/* 悬浮球容器 - 最外层容器，控制整体定位和尺寸 */
 .ball-container {
     position: fixed;
     width: 60px;
     height: 60px;
-    z-index: 9999;
+    z-index: 1024;
     right: 20px;
     bottom: 20px;
     display: flex;
@@ -14,7 +20,7 @@
     transition: all 0.3s ease;
 }
 
-/* 悬浮球主体 */
+/* 悬浮球主体 - 继承自.ball-container，实现渐变背景和交互效果 */
 #ai-assistant-ball {
     width: 50px;
     height: 50px;
@@ -39,10 +45,10 @@
     transform: scale(0.95);
 }
 
-/* 悬浮球图标 */
+/* 悬浮球图标 - 继承自#ai-assistant-ball，控制内部SVG图标样式 */
 #ai-assistant-ball .icon {
-    width: 32px;
-    height: 32px;
+    width: 30px;
+    height: 30px;
     transition: transform 0.3s ease;
 }
 
@@ -50,7 +56,7 @@
     transform: rotate(10deg);
 }
 
-/* 边缘状态样式 */
+/* 边缘状态样式 - 继承自#ai-assistant-ball，实现边缘吸附时的形状变化 */
 #ai-assistant-ball.edge-left,
 #ai-assistant-ball.edge-right {
     border-radius: 50% 25px 25px 50%;
@@ -79,14 +85,14 @@
     transform: translateY(15px);
 }
 
-/* 设置按钮 */
+/* 设置按钮 - 继承自.ball-container，悬停时显示的设置按钮 */
 .settings-button {
     position: absolute;
-    top: -8px;
-    right: -8px;
-    width: 24px;
-    height: 24px;
-    background: rgba(255, 255, 255, 0.9);
+    bottom: -15px;
+    right: -5px;
+    width: 20px;
+    height: 20px;
+    background: rgba(255, 255, 255, 0.1);
     border-radius: 50%;
     cursor: pointer;
     display: flex;
@@ -95,7 +101,7 @@
     opacity: 0;
     transform: scale(0.8);
     transition: all 0.3s ease;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 2px 2px rgba(0, 0, 0, 0.1);
 }
 
 .ball-container:hover .settings-button {
@@ -113,10 +119,20 @@
     height: 16px;
 }
 
-/* 对话框主容器 */
+.settings-button svg path {
+    fill: #666 !important;
+}
+
+/* ========================================
+ * 对话框组件样式
+ * DOM结构: #ai-assistant-dialog > .container > (.header + .chat-container + .input-container) + .resize-handle
+ * 功能: 可拖拽、可调整大小的聊天对话框
+ * ======================================== */
+
+/* 对话框主容器 - 最外层容器，控制整体定位、尺寸和显示状态 */
 #ai-assistant-dialog {
     position: fixed;
-    width: 400px;
+    width: 420px;
     height: 500px;
     background: white;
     border-radius: 12px;
@@ -140,17 +156,20 @@
     pointer-events: all;
 }
 
-/* 对话框容器 */
+/* 对话框容器 - 继承自#ai-assistant-dialog，内容区域的直接父容器 */
 #ai-assistant-dialog .container {
     display: flex;
     flex-direction: column;
     height: 100%;
     position: relative;
+    width: 100%;
+    box-sizing: border-box;
+    max-width: 100%;
 }
 
-/* 对话框头部 */
+/* 对话框头部 - 继承自.container，可拖拽的标题栏区域 */
 #ai-assistant-dialog .header {
-    padding: 16px 20px;
+    padding: 16px 22px;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
     cursor: move;
@@ -160,52 +179,75 @@
     align-items: center;
     border-radius: 12px 12px 0 0;
     position: relative;
+    width: 100%;
+    box-sizing: border-box;
+    max-width: 100%;
 }
 
 #ai-assistant-dialog .header:hover {
     background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
 }
 
+/* 对话框标题 - 继承自.header，显示"Web Chat"标题文本 */
+.header-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: white;
+    margin: 0;
+    text-align: center;
+    width: 100%;
+}
 
-
-/* 聊天容器 */
-.chat-container {
+/* 聊天容器 - 继承自.container，包含消息显示区域的容器 */
+#ai-assistant-dialog .chat-container {
     flex: 1;
     display: flex;
     flex-direction: column;
     position: relative;
     overflow: hidden;
+    width: 100%;
+    box-sizing: border-box;
+    max-width: 100%;
 }
 
-/* 消息容器 */
-.messages {
+/* 消息容器 - 继承自.chat-container，实际显示消息列表的滚动区域 */
+#ai-assistant-dialog .messages {
     flex: 1;
     padding: 20px;
     overflow-y: auto;
     scroll-behavior: smooth;
     background: #fafafa;
+    width: 100%;
+    box-sizing: border-box;
+    max-width: 100%;
 }
 
-/* 自定义滚动条 */
-.messages::-webkit-scrollbar {
+/* 自定义滚动条 - 继承自.messages，美化滚动条样式 */
+#ai-assistant-dialog .messages::-webkit-scrollbar {
     width: 6px;
 }
 
-.messages::-webkit-scrollbar-track {
+#ai-assistant-dialog .messages::-webkit-scrollbar-track {
     background: transparent;
 }
 
-.messages::-webkit-scrollbar-thumb {
+#ai-assistant-dialog .messages::-webkit-scrollbar-thumb {
     background: rgba(0, 0, 0, 0.2);
     border-radius: 3px;
 }
 
-.messages::-webkit-scrollbar-thumb:hover {
+#ai-assistant-dialog .messages::-webkit-scrollbar-thumb:hover {
     background: rgba(0, 0, 0, 0.3);
 }
 
-/* 消息样式 */
-.message {
+/* ========================================
+ * 消息组件样式
+ * DOM结构: .messages > .message(.user-message/.assistant-message/.welcome-message)
+ * 功能: 不同类型消息的显示样式
+ * ======================================== */
+
+/* 消息基础样式 - 继承自.messages，所有消息的通用样式 */
+#ai-assistant-dialog .message {
     margin-bottom: 16px;
     padding: 12px 16px;
     border-radius: 12px;
@@ -226,16 +268,16 @@
     }
 }
 
-/* 用户消息 */
-.user-message {
+/* 用户消息 - 继承自.message，用户发送的消息样式 */
+#ai-assistant-dialog .user-message {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
     margin-left: auto;
     border-bottom-right-radius: 4px;
 }
 
-/* AI助手消息 */
-.assistant-message {
+/* AI助手消息 - 继承自.message，AI回复的消息样式 */
+#ai-assistant-dialog .assistant-message {
     background: white;
     color: #333;
     margin-right: auto;
@@ -244,21 +286,21 @@
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
-/* 欢迎消息 */
-.welcome-message {
+/* 欢迎消息 - 继承自.messages，初始欢迎文本样式 */
+#ai-assistant-dialog .welcome-message {
     text-align: center;
     color: #666;
     font-style: italic;
     margin: 40px 0;
 }
 
-.welcome-message p {
+#ai-assistant-dialog .welcome-message p {
     margin: 0;
     font-size: 16px;
 }
 
-/* 打字指示器 */
-.typing-indicator {
+/* 打字指示器 - 继承自.message.assistant-message，显示AI正在输入的动画 */
+#ai-assistant-dialog .typing-indicator {
     display: flex;
     align-items: center;
     gap: 4px;
@@ -269,7 +311,7 @@
     max-width: 80px;
 }
 
-.typing-indicator span {
+#ai-assistant-dialog .typing-indicator span {
     width: 8px;
     height: 8px;
     border-radius: 50%;
@@ -277,11 +319,11 @@
     animation: typingDot 1.4s infinite ease-in-out;
 }
 
-.typing-indicator span:nth-child(1) {
+#ai-assistant-dialog .typing-indicator span:nth-child(1) {
     animation-delay: -0.32s;
 }
 
-.typing-indicator span:nth-child(2) {
+#ai-assistant-dialog .typing-indicator span:nth-child(2) {
     animation-delay: -0.16s;
 }
 
@@ -296,18 +338,27 @@
     }
 }
 
-/* 输入容器 */
-.input-container {
+/* ========================================
+ * 输入组件样式
+ * DOM结构: .container > .input-container > (#userInput + #askButton.send-button)
+ * 功能: 用户输入区域和发送按钮
+ * ======================================== */
+
+/* 输入容器 - 继承自.container，包含输入框和发送按钮的容器 */
+#ai-assistant-dialog .input-container {
     padding: 20px;
     background: white;
     border-top: 1px solid #e1e5e9;
     display: flex;
     gap: 12px;
-    align-items: flex-end;
+    align-items: center;
+    width: 100%;
+    box-sizing: border-box;
+    max-width: 100%;
 }
 
-/* 输入框 */
-#userInput {
+/* 输入框 - 继承自.input-container，用户输入文本的textarea元素 */
+#ai-assistant-dialog #userInput {
     flex: 1;
     border: 2px solid #e1e5e9;
     border-radius: 8px;
@@ -320,19 +371,20 @@
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     min-height: 20px;
     max-height: 100px;
+    box-sizing: border-box;
 }
 
-#userInput:focus {
+#ai-assistant-dialog #userInput:focus {
     border-color: #667eea;
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
-#userInput::placeholder {
+#ai-assistant-dialog #userInput::placeholder {
     color: #999;
 }
 
-/* 发送按钮 */
-.send-button {
+/* 发送按钮 - 继承自.input-container，触发消息发送的按钮 */
+#ai-assistant-dialog .send-button {
     width: 44px;
     height: 44px;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -347,23 +399,23 @@
     overflow: hidden;
 }
 
-.send-button:hover {
+#ai-assistant-dialog .send-button:hover {
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
 }
 
-.send-button:active {
+#ai-assistant-dialog .send-button:active {
     transform: translateY(0);
 }
 
-.send-button:disabled {
+#ai-assistant-dialog .send-button:disabled {
     opacity: 0.6;
     cursor: not-allowed;
     transform: none;
 }
 
-/* 发送按钮图标 */
-.send-button::before {
+/* 发送按钮图标 - 继承自.send-button，按钮内的箭头图标样式 */
+#ai-assistant-dialog .send-button::before {
     content: '→';
     color: white;
     font-size: 18px;
@@ -371,7 +423,7 @@
     transition: transform 0.3s ease;
 }
 
-.send-button.generating::before {
+#ai-assistant-dialog .send-button.generating::before {
     content: '⏹';
     animation: pulse 1s infinite;
 }
@@ -385,7 +437,13 @@
     }
 }
 
-/* 调整大小手柄 */
+/* ========================================
+ * 功能组件样式
+ * DOM结构: #ai-assistant-dialog > .resize-handle, .dialog-overlay
+ * 功能: 对话框调整大小和拖拽辅助
+ * ======================================== */
+
+/* 调整大小手柄 - 继承自#ai-assistant-dialog，右下角的调整大小控件 */
 .resize-handle {
     position: absolute;
     bottom: 0;
@@ -402,7 +460,7 @@
     opacity: 1;
 }
 
-/* 拖拽遮罩层 */
+/* 拖拽遮罩层 - 独立组件，拖拽时的全屏遮罩层 */
 .dialog-overlay {
     position: fixed;
     top: 0;
@@ -421,81 +479,17 @@
     opacity: 1;
 }
 
-/* 滚动到底部按钮 */
-.scroll-to-bottom-button {
-    position: absolute;
-    bottom: 20px;
-    right: 20px;
-    background: rgba(102, 126, 234, 0.9);
-    color: white;
-    border: none;
-    border-radius: 20px;
-    padding: 8px 16px;
-    font-size: 12px;
-    cursor: pointer;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-    transition: all 0.3s ease;
-    z-index: 10;
-}
 
-.scroll-to-bottom-button:hover {
-    background: rgba(102, 126, 234, 1);
-    transform: translateY(-1px);
-}
 
-/* 右键菜单 */
-.context-menu {
-    background: white;
-    border: 1px solid #e1e5e9;
-    border-radius: 8px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-    z-index: 10001;
-    overflow: hidden;
-    min-width: 120px;
-}
 
-.context-menu-item {
-    padding: 12px 16px;
-    cursor: pointer;
-    font-size: 14px;
-    color: #333;
-    transition: background-color 0.2s ease;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
 
-.context-menu-item:hover {
-    background: #f5f5f5;
-}
+/* ========================================
+ * 通知组件样式
+ * DOM结构: .extension-notification（独立组件）
+ * 功能: 显示扩展相关通知消息
+ * ======================================== */
 
-/* 复制提示 */
-.copy-toast {
-    background: rgba(0, 0, 0, 0.8);
-    color: white;
-    padding: 8px 12px;
-    border-radius: 4px;
-    font-size: 12px;
-    z-index: 10002;
-    animation: fadeInOut 2s ease forwards;
-}
-
-@keyframes fadeInOut {
-    0% {
-        opacity: 0;
-        transform: translate(-50%, -50%) scale(0.8);
-    }
-    20%, 80% {
-        opacity: 1;
-        transform: translate(-50%, -50%) scale(1);
-    }
-    100% {
-        opacity: 0;
-        transform: translate(-50%, -50%) scale(0.8);
-    }
-}
-
-/* 通知样式 */
+/* 通知样式 - 独立组件，右上角显示的通知消息 */
 .extension-notification {
     position: fixed;
     right: 20px;
@@ -522,30 +516,36 @@
     }
 }
 
-/* Markdown内容样式 */
-.message h1, .message h2, .message h3, .message h4, .message h5, .message h6 {
+/* ========================================
+ * Markdown内容样式
+ * DOM结构: .message > (h1-h6, p, ul, ol, li, code, pre, blockquote, table等)
+ * 功能: AI回复消息中的Markdown格式化内容
+ * ======================================== */
+
+/* Markdown标题样式 - 继承自.message，各级标题的样式 */
+#ai-assistant-dialog .message h1, #ai-assistant-dialog .message h2, #ai-assistant-dialog .message h3, #ai-assistant-dialog .message h4, #ai-assistant-dialog .message h5, #ai-assistant-dialog .message h6 {
     margin: 16px 0 8px 0;
     font-weight: 600;
 }
 
-.message h1 { font-size: 1.5em; }
-.message h2 { font-size: 1.3em; }
-.message h3 { font-size: 1.1em; }
+#ai-assistant-dialog .message h1 { font-size: 1.5em; }
+#ai-assistant-dialog .message h2 { font-size: 1.3em; }
+#ai-assistant-dialog .message h3 { font-size: 1.1em; }
 
-.message p {
+#ai-assistant-dialog .message p {
     margin: 8px 0;
 }
 
-.message ul, .message ol {
+#ai-assistant-dialog .message ul, #ai-assistant-dialog .message ol {
     margin: 8px 0;
     padding-left: 20px;
 }
 
-.message li {
+#ai-assistant-dialog .message li {
     margin: 4px 0;
 }
 
-.message code {
+#ai-assistant-dialog .message code {
     background: rgba(0, 0, 0, 0.1);
     padding: 2px 4px;
     border-radius: 3px;
@@ -553,7 +553,7 @@
     font-size: 0.9em;
 }
 
-.message pre {
+#ai-assistant-dialog .message pre {
     background: #f8f9fa;
     border: 1px solid #e1e5e9;
     border-radius: 6px;
@@ -562,12 +562,12 @@
     margin: 12px 0;
 }
 
-.message pre code {
+#ai-assistant-dialog .message pre code {
     background: none;
     padding: 0;
 }
 
-.message blockquote {
+#ai-assistant-dialog .message blockquote {
     border-left: 4px solid #667eea;
     margin: 12px 0;
     padding: 8px 16px;
@@ -575,33 +575,39 @@
     font-style: italic;
 }
 
-.message table {
+#ai-assistant-dialog .message table {
     border-collapse: collapse;
     width: 100%;
     margin: 12px 0;
 }
 
-.message th, .message td {
+#ai-assistant-dialog .message th, #ai-assistant-dialog .message td {
     border: 1px solid #e1e5e9;
     padding: 8px 12px;
     text-align: left;
 }
 
-.message th {
+#ai-assistant-dialog .message th {
     background: #f8f9fa;
     font-weight: 600;
 }
 
-.message a {
+#ai-assistant-dialog .message a {
     color: #667eea;
     text-decoration: none;
 }
 
-.message a:hover {
+#ai-assistant-dialog .message a:hover {
     text-decoration: underline;
 }
 
-/* 响应式设计 */
+/* ========================================
+ * 响应式设计
+ * 功能: 适配不同屏幕尺寸的样式调整
+ * 继承关系: 覆盖上述所有组件的默认样式
+ * ======================================== */
+
+/* 平板设备适配 (768px以下) */
 @media (max-width: 768px) {
     #ai-assistant-dialog {
         width: calc(100vw - 40px);
@@ -617,7 +623,7 @@
         bottom: 15px;
     }
     
-    .message {
+    #ai-assistant-dialog .message {
         max-width: 90%;
     }
 }
@@ -635,83 +641,76 @@
         bottom: 10px;
     }
     
-    .messages {
+    #ai-assistant-dialog .messages {
         padding: 15px;
     }
     
-    .input-container {
+    #ai-assistant-dialog .input-container {
         padding: 15px;
     }
     
-    .message {
+    #ai-assistant-dialog .message {
         padding: 10px 12px;
         font-size: 14px;
     }
 }
 
-/* 深色模式支持 */
+/* ========================================
+ * 深色模式支持
+ * 功能: 系统深色模式下的样式适配
+ * 继承关系: 覆盖上述所有组件的颜色样式
+ * ======================================== */
+
+/* 深色模式适配 - 根据系统偏好自动切换 */
 @media (prefers-color-scheme: dark) {
     #ai-assistant-dialog {
         background: #2d3748;
         border-color: #4a5568;
     }
     
-    .messages {
+    #ai-assistant-dialog .messages {
         background: #1a202c;
     }
     
-    .assistant-message {
+    #ai-assistant-dialog .assistant-message {
         background: #2d3748;
         color: #e2e8f0;
         border-color: #4a5568;
     }
     
-    .input-container {
+    #ai-assistant-dialog .input-container {
         background: #2d3748;
         border-color: #4a5568;
     }
     
-    #userInput {
+    #ai-assistant-dialog #userInput {
         background: #1a202c;
         color: #e2e8f0;
         border-color: #4a5568;
     }
     
-    #userInput::placeholder {
+    #ai-assistant-dialog #userInput::placeholder {
         color: #a0aec0;
     }
     
-    .context-menu {
-        background: #2d3748;
-        border-color: #4a5568;
-    }
-    
-    .context-menu-item {
-        color: #e2e8f0;
-    }
-    
-    .context-menu-item:hover {
-        background: #4a5568;
-    }
-    
-    .welcome-message {
+    #ai-assistant-dialog .welcome-message {
         color: #a0aec0;
     }
     
-    .message pre {
+    #ai-assistant-dialog .message pre {
         background: #1a202c;
         border-color: #4a5568;
     }
     
-    .message code {
+    #ai-assistant-dialog .message code {
         background: rgba(255, 255, 255, 0.1);
     }
     
-    .message th {
+    #ai-assistant-dialog .message th {
         background: #4a5568;
     }
     
-    .message th, .message td {
+    #ai-assistant-dialog .message th, #ai-assistant-dialog .message td {
         border-color: #4a5568;
     }
 }

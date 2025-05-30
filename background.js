@@ -26,6 +26,9 @@ const generationStates = new Map();
 // 存储活跃的端口连接
 const activePorts = new Map();
 
+// 存储每个标签页的网页内容缓存
+const pageContentCache = new Map();
+
 // ==================== 工具函数 ====================
 
 // 格式化API地址
@@ -53,11 +56,75 @@ function parseWebContent(content) {
         .replace(/\s+/g, ' ')
         .replace(/\n\s*\n/g, '\n')
         .trim()
-        .substring(0, 8000); // 限制长度
+        .substring(0, 8192); // 限制长度
+}
+
+// 优化网页内容，减少token消耗
+function optimizePageContent(content) {
+    if (!content) return '';
+    
+    // 移除重复的空白字符和换行
+    let optimized = content
+        .replace(/\s+/g, ' ')
+        .replace(/\n\s*\n/g, '\n')
+        .trim();
+    
+    // 如果内容过长，进行智能截取
+    if (optimized.length > 8000) {
+        // 保留开头和结尾的重要内容
+        const start = optimized.substring(0, 4000);
+        const end = optimized.substring(optimized.length - 2000);
+        optimized = start + '\n\n[... 中间内容已省略 ...]\n\n' + end;
+    }
+    
+    return optimized;
+}
+
+// 判断是否需要包含网页内容
+function shouldIncludePageContent(tabId, pageContent, question, history) {
+    if (!tabId || !pageContent) return false;
+    
+    // 检查缓存
+    const cached = pageContentCache.get(tabId);
+    const currentHash = generateContentHash(pageContent);
+    
+    // 如果是第一次对话或网页内容发生变化，需要发送
+    if (!cached || cached.hash !== currentHash || history.length === 0) {
+        return true;
+    }
+    
+    // 检查问题是否与网页内容相关
+    const contentRelatedKeywords = ['页面', '网页', '内容', '文章', '这里', '这个', '上面', '下面', '显示'];
+    const isContentRelated = contentRelatedKeywords.some(keyword => 
+        question.toLowerCase().includes(keyword)
+    );
+    
+    // 如果最近5轮对话都没有涉及网页内容，且当前问题也不相关，则不发送
+    const recentHistory = history.slice(-10); // 最近5轮对话
+    const hasRecentContentReference = recentHistory.some(msg => 
+        contentRelatedKeywords.some(keyword => 
+            msg.content.toLowerCase().includes(keyword)
+        )
+    );
+    
+    return isContentRelated || hasRecentContentReference;
+}
+
+// 生成内容哈希值
+function generateContentHash(content) {
+    if (!content) return '';
+    
+    let hash = 0;
+    for (let i = 0; i < content.length; i++) {
+        const char = content.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // 转换为32位整数
+    }
+    return hash.toString();
 }
 
 // 构建对话消息
-function buildMessages(settings, pageContent, question, history = []) {
+function buildMessages(settings, pageContent, question, history = [], tabId = null, needsPageContext = true) {
     const messages = [];
     
     // 添加系统提示
@@ -68,15 +135,30 @@ function buildMessages(settings, pageContent, question, history = []) {
         });
     }
     
-    // 添加网页内容上下文
-    if (pageContent) {
-        messages.push({
-            role: "system",
-            content: `当前网页内容：\n${pageContent}`
-        });
+    // 智能添加网页内容上下文
+    if (pageContent && needsPageContext) {
+        // 检查是否需要发送网页内容
+        const shouldSendPageContent = shouldIncludePageContent(tabId, pageContent, question, history);
+        
+        if (shouldSendPageContent) {
+            const processedContent = optimizePageContent(pageContent);
+            messages.push({
+                role: "system",
+                content: `当前网页内容：\n${processedContent}`
+            });
+            
+            // 更新缓存
+            if (tabId) {
+                pageContentCache.set(tabId, {
+                    content: pageContent,
+                    hash: generateContentHash(pageContent),
+                    lastUsed: Date.now()
+                });
+            }
+        }
     }
     
-    // 添加历史对话（如果启用上下文）
+    // 开启对话历史记录功能
     if (settings.enableContext && history.length > 0) {
         const maxRounds = 4;
         const recentHistory = history.slice(-maxRounds * 2); // 每轮包含用户和助手消息
@@ -224,6 +306,7 @@ function addToHistory(tabId, content, isUser, markdownContent = null) {
 function clearTabHistory(tabId) {
     tabHistories.delete(tabId);
     generationStates.delete(tabId);
+    pageContentCache.delete(tabId);
 }
 
 // ==================== 消息处理 ====================
@@ -246,6 +329,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 
             case 'clearHistory':
                 handleClearHistory(request, sendResponse);
+                break;
+                
+            case 'clearCurrentTabHistory':
+                handleClearCurrentTabHistory(request, sender, sendResponse);
                 break;
                 
             case 'openOptions':
@@ -301,6 +388,17 @@ function handleClearHistory(request, sendResponse) {
     sendResponse({ success: true });
 }
 
+// 处理清空当前标签页历史记录
+function handleClearCurrentTabHistory(request, sender, sendResponse) {
+    const tabId = sender.tab?.id;
+    if (tabId) {
+        clearTabHistory(tabId);
+        sendResponse({ success: true });
+    } else {
+        sendResponse({ error: '无法获取标签页ID' });
+    }
+}
+
 // 处理打开选项页面
 function handleOpenOptions(sendResponse) {
     chrome.runtime.openOptionsPage();
@@ -315,6 +413,19 @@ chrome.runtime.onConnect.addListener((port) => {
         handleAnswerStream(port);
     }
 });
+
+// 安全发送端口消息
+function safePostMessage(port, message) {
+    try {
+        if (port && !port.disconnected) {
+            port.postMessage(message);
+            return true;
+        }
+    } catch (error) {
+        console.warn('端口已断开连接，无法发送消息:', error);
+    }
+    return false;
+}
 
 // 处理答案流
 function handleAnswerStream(port) {
@@ -335,7 +446,7 @@ function handleAnswerStream(port) {
             }
         } catch (error) {
             console.error('处理端口消息时出错:', error);
-            port.postMessage({
+            safePostMessage(port, {
                 type: 'error',
                 error: error.message
             });
@@ -347,6 +458,8 @@ function handleAnswerStream(port) {
         for (const [tabId, portInfo] of activePorts.entries()) {
             if (portInfo.port === port) {
                 activePorts.delete(tabId);
+                // 清理对应的生成状态
+                generationStates.delete(tabId);
                 break;
             }
         }
@@ -394,7 +507,7 @@ async function handleGenerateAnswer(msg, port) {
         const history = getTabHistory(tabId);
         
         // 构建消息
-        const messages = buildMessages(settings, parseWebContent(pageContent), question, history.slice(0, -1));
+        const messages = buildMessages(settings, parseWebContent(pageContent), question, history.slice(0, -1), tabId, true);
         
         let fullAnswer = '';
         
@@ -410,7 +523,7 @@ async function handleGenerateAnswer(msg, port) {
                     state.currentAnswer = fullAnswer;
                 }
                 
-                port.postMessage({
+                safePostMessage(port, {
                     type: 'answer-chunk',
                     content: chunk
                 });
@@ -424,7 +537,7 @@ async function handleGenerateAnswer(msg, port) {
                 generationStates.delete(tabId);
                 activePorts.delete(tabId);
                 
-                port.postMessage({
+                safePostMessage(port, {
                     type: 'answer-end',
                     content: finalAnswer
                 });
@@ -435,7 +548,7 @@ async function handleGenerateAnswer(msg, port) {
                 generationStates.delete(tabId);
                 activePorts.delete(tabId);
                 
-                port.postMessage({
+                safePostMessage(port, {
                     type: 'error',
                     error: error
                 });
@@ -447,7 +560,7 @@ async function handleGenerateAnswer(msg, port) {
         generationStates.delete(tabId);
         activePorts.delete(tabId);
         
-        port.postMessage({
+        safePostMessage(port, {
             type: 'error',
             error: error.message
         });
@@ -465,13 +578,13 @@ function handleReconnectStream(msg, port) {
         
         // 发送当前已生成的内容
         if (state.currentAnswer) {
-            port.postMessage({
+            safePostMessage(port, {
                 type: 'answer-chunk',
                 content: state.currentAnswer
             });
         }
     } else {
-        port.postMessage({
+        safePostMessage(port, {
             type: 'error',
             error: '没有正在进行的生成任务'
         });
@@ -486,7 +599,7 @@ function handleStopGeneration(msg, port) {
     generationStates.delete(tabId);
     activePorts.delete(tabId);
     
-    port.postMessage({
+    safePostMessage(port, {
         type: 'answer-end',
         content: '生成已停止'
     });
@@ -510,8 +623,26 @@ chrome.tabs.onRemoved.addListener((tabId) => {
     clearTabHistory(tabId);
 });
 
-// 标签页更新时清理生成状态（但保留历史记录）
+// 定期清理过期的页面内容缓存
+setInterval(() => {
+    const now = Date.now();
+    const maxAge = 30 * 60 * 1000; // 30分钟
+    
+    for (const [tabId, cache] of pageContentCache.entries()) {
+        if (now - cache.lastUsed > maxAge) {
+            pageContentCache.delete(tabId);
+        }
+    }
+}, 10 * 60 * 1000); // 每10分钟清理一次
+
+// 标签页更新时的处理
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+    // URL变化时清空历史记录和页面缓存，确保不同网页初始状态一致
+    if (changeInfo.url) {
+        clearTabHistory(tabId);
+    }
+    
+    // 页面加载时清理生成状态
     if (changeInfo.status === 'loading') {
         const state = generationStates.get(tabId);
         if (state && state.isGenerating) {
