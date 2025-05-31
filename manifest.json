@@ -33,17 +33,18 @@
             ],
             "js": [
                 "lib/marked.min.js",
-                "content.js"
+                "content/content.js"
             ],
             "css": [
-                "content.css"
+                "content/content.css"
             ]
         }
     ],
     "web_accessible_resources": [
         {
             "resources": [
-                "lib/marked.min.js"
+                "lib/marked.min.js",
+                "content/content.html"
             ],
             "matches": [
                 "<all_urls>"
