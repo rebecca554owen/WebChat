@@ -88,11 +88,11 @@
 /* 设置按钮 - 继承自.ball-container，悬停时显示的设置按钮 */
 .settings-button {
     position: absolute;
-    bottom: -15px;
-    right: -5px;
-    width: 20px;
-    height: 20px;
-    background: rgba(255, 255, 255, 0.1);
+    top: -10px;
+    right: -10px;
+    width: 24px;
+    height: 24px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     border-radius: 50%;
     cursor: pointer;
     display: flex;
@@ -101,7 +101,7 @@
     opacity: 0;
     transform: scale(0.8);
     transition: all 0.3s ease;
-    box-shadow: 0 2px 2px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
 }
 
 .ball-container:hover .settings-button {
@@ -110,17 +110,18 @@
 }
 
 .settings-button:hover {
-    background: white;
+    background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
     transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.5);
 }
 
 .settings-button svg {
-    width: 16px;
-    height: 16px;
+    width: 14px;
+    height: 14px;
 }
 
 .settings-button svg path {
-    fill: #666 !important;
+    fill: white !important;
 }
 
 /* ========================================
@@ -132,7 +133,7 @@
 /* 对话框主容器 - 最外层容器，控制整体定位、尺寸和显示状态 */
 #ai-assistant-dialog {
     position: fixed;
-    width: 420px;
+    width: 500px;
     height: 500px;
     background: white;
     border-radius: 12px;
@@ -144,19 +145,20 @@
     transform: scale(0.9) translateY(20px);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     pointer-events: none;
-    right: 20px;
-    bottom: 90px;
+    right: 80px;
+    bottom: 20px;
     border: 1px solid rgba(0, 0, 0, 0.1);
     overflow: hidden;
 }
 
+/* 显示状态 - 继承自#ai-assistant-dialog */
 #ai-assistant-dialog.show {
     opacity: 1;
     transform: scale(1) translateY(0);
     pointer-events: all;
 }
 
-/* 对话框容器 - 继承自#ai-assistant-dialog，内容区域的直接父容器 */
+/* 对话框容器 - 继承自#ai-assistant-dialog */
 #ai-assistant-dialog .container {
     display: flex;
     flex-direction: column;
@@ -167,7 +169,7 @@
     max-width: 100%;
 }
 
-/* 对话框头部 - 继承自.container，可拖拽的标题栏区域 */
+/* 对话框头部 - 继承自#ai-assistant-dialog .container */
 #ai-assistant-dialog .header {
     padding: 16px 22px;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -184,21 +186,60 @@
     max-width: 100%;
 }
 
+/* 头部悬停状态 - 继承自#ai-assistant-dialog .header */
 #ai-assistant-dialog .header:hover {
     background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
 }
 
-/* 对话框标题 - 继承自.header，显示"Web Chat"标题文本 */
+/* 对话框标题 - 继承自#ai-assistant-dialog .header */
 .header-title {
     font-size: 16px;
     font-weight: 600;
     color: white;
     margin: 0;
-    text-align: center;
-    width: 100%;
+    flex: 1;
 }
 
-/* 聊天容器 - 继承自.container，包含消息显示区域的容器 */
+/* 头部控制按钮容器 - 继承自#ai-assistant-dialog .header */
+.header-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+/* 头部按钮样式 - 继承自.header-controls */
+.header-btn {
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: transparent;
+    color: white;
+    cursor: pointer;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    opacity: 0.7;
+}
+
+.header-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    opacity: 1;
+    transform: scale(1.05);
+}
+
+.header-btn:active {
+    transform: scale(0.95);
+}
+
+.header-btn svg {
+    width: 14px;
+    height: 14px;
+    fill: currentColor;
+}
+
+/* 对话框聊天容器 - 继承自#ai-assistant-dialog .container */
 #ai-assistant-dialog .chat-container {
     flex: 1;
     display: flex;
@@ -210,19 +251,20 @@
     max-width: 100%;
 }
 
-/* 消息容器 - 继承自.chat-container，实际显示消息列表的滚动区域 */
+/* 对话框消息容器 - 继承自#ai-assistant-dialog .chat-container */
 #ai-assistant-dialog .messages {
     flex: 1;
     padding: 20px;
+    padding-right: 15px; /* 为右侧缩放控件留出空间 */
     overflow-y: auto;
     scroll-behavior: smooth;
     background: #fafafa;
-    width: 100%;
+    width: calc(100% - 10px); /* 减去右侧缩放控件的宽度空间 */
     box-sizing: border-box;
-    max-width: 100%;
+    max-width: calc(100% - 10px);
 }
 
-/* 自定义滚动条 - 继承自.messages，美化滚动条样式 */
+/* 自定义滚动条 - 继承自#ai-assistant-dialog .messages */
 #ai-assistant-dialog .messages::-webkit-scrollbar {
     width: 6px;
 }
@@ -443,21 +485,98 @@
  * 功能: 对话框调整大小和拖拽辅助
  * ======================================== */
 
-/* 调整大小手柄 - 继承自#ai-assistant-dialog，右下角的调整大小控件 */
+/* ========== 缩放手柄基础样式 ========== */
+/* 调整大小手柄 - 继承自#ai-assistant-dialog，各方向的调整大小控件 */
 .resize-handle {
     position: absolute;
-    bottom: 0;
-    right: 0;
-    width: 20px;
-    height: 20px;
-    cursor: nw-resize;
-    background: linear-gradient(-45deg, transparent 30%, #ccc 30%, #ccc 40%, transparent 40%, transparent 60%, #ccc 60%, #ccc 70%, transparent 70%);
-    opacity: 0.6;
-    transition: opacity 0.3s ease;
+    background: rgba(255, 255, 255, 0.5);
+    opacity: 0;
+    transition: all 0.3s ease;
+    z-index: 10;
 }
 
+/* 只有悬停到具体缩放手柄时才显示该手柄 */
 .resize-handle:hover {
     opacity: 1;
+    background: rgba(255, 255, 255, 0.6);
+}
+
+/* ========== 边缘缩放手柄 ========== */
+/* 上边缩放手柄 - 扩展到角落 */
+.resize-handle.resize-n {
+    top: 0;
+    left: 10px;
+    right: 10px;
+    height: 5px;
+    cursor: n-resize;
+}
+
+/* 下边缩放手柄 - 扩展到角落 */
+.resize-handle.resize-s {
+    bottom: 0;
+    left: 10px;
+    right: 10px;
+    height: 5px;
+    cursor: s-resize;
+}
+
+/* 左边缩放手柄 - 扩展到角落 */
+.resize-handle.resize-w {
+    left: 0;
+    top: 10px;
+    bottom: 10px;
+    width: 5px;
+    cursor: w-resize;
+}
+
+/* 右边缩放手柄 - 扩展到角落*/
+.resize-handle.resize-e {
+    right: 0;
+    top: 10px;
+    bottom: 10px;
+    width: 5px;
+    cursor: e-resize;
+}
+
+/* ========== 角落缩放手柄 ========== */
+/* 左上角缩放手柄 */
+.resize-handle.resize-nw {
+    top: 0;
+    left: 0;
+    width: 10px;
+    height: 10px;
+    cursor: nw-resize;
+    border-radius: 0 0 5px 0;
+}
+
+/* 右上角缩放手柄 */
+.resize-handle.resize-ne {
+    top: 0;
+    right: 0;
+    width: 10px;
+    height: 10px;
+    cursor: ne-resize;
+    border-radius: 0 0 0 5px;
+}
+
+/* 左下角缩放手柄 */
+.resize-handle.resize-sw {
+    bottom: 0;
+    left: 0;
+    width: 10px;
+    height: 10px;
+    cursor: sw-resize;
+    border-radius: 0 5px 0 0;
+}
+
+/* 右下角缩放手柄 */
+.resize-handle.resize-se {
+    bottom: 0;
+    right: 0;
+    width: 10px;
+    height: 10px;
+    cursor: se-resize;
+    border-radius: 5px 0 0 0;
 }
 
 /* 拖拽遮罩层 - 独立组件，拖拽时的全屏遮罩层 */
@@ -478,10 +597,6 @@
     pointer-events: all;
     opacity: 1;
 }
-
-
-
-
 
 /* ========================================
  * 通知组件样式
@@ -602,60 +717,6 @@
 }
 
 /* ========================================
- * 响应式设计
- * 功能: 适配不同屏幕尺寸的样式调整
- * 继承关系: 覆盖上述所有组件的默认样式
- * ======================================== */
-
-/* 平板设备适配 (768px以下) */
-@media (max-width: 768px) {
-    #ai-assistant-dialog {
-        width: calc(100vw - 40px);
-        height: calc(100vh - 40px);
-        max-width: 400px;
-        max-height: 600px;
-        right: 20px;
-        bottom: 20px;
-    }
-    
-    .ball-container {
-        right: 15px;
-        bottom: 15px;
-    }
-    
-    #ai-assistant-dialog .message {
-        max-width: 90%;
-    }
-}
-
-@media (max-width: 480px) {
-    #ai-assistant-dialog {
-        width: calc(100vw - 20px);
-        height: calc(100vh - 20px);
-        right: 10px;
-        bottom: 10px;
-    }
-    
-    .ball-container {
-        right: 10px;
-        bottom: 10px;
-    }
-    
-    #ai-assistant-dialog .messages {
-        padding: 15px;
-    }
-    
-    #ai-assistant-dialog .input-container {
-        padding: 15px;
-    }
-    
-    #ai-assistant-dialog .message {
-        padding: 10px 12px;
-        font-size: 14px;
-    }
-}
-
-/* ========================================
  * 深色模式支持
  * 功能: 系统深色模式下的样式适配
  * 继承关系: 覆盖上述所有组件的颜色样式
@@ -712,5 +773,34 @@
     
     #ai-assistant-dialog .message th, #ai-assistant-dialog .message td {
         border-color: #4a5568;
+    }
+    
+    /* Markdown内容深色模式适配 */
+    #ai-assistant-dialog .message h1,
+    #ai-assistant-dialog .message h2,
+    #ai-assistant-dialog .message h3,
+    #ai-assistant-dialog .message h4,
+    #ai-assistant-dialog .message h5,
+    #ai-assistant-dialog .message h6 {
+        color: #f7fafc;
+    }
+    
+    #ai-assistant-dialog .message p,
+    #ai-assistant-dialog .message li {
+        color: #e2e8f0;
+    }
+    
+    #ai-assistant-dialog .message blockquote {
+        border-left-color: #667eea;
+        background: rgba(102, 126, 234, 0.1);
+        color: #cbd5e0;
+    }
+    
+    #ai-assistant-dialog .message a {
+        color: #90cdf4;
+    }
+    
+    #ai-assistant-dialog .message td {
+        color: #e2e8f0;
     }
 }

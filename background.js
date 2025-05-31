@@ -4,7 +4,7 @@
 // ==================== 配置常量 ====================
 
 const DEFAULT_SETTINGS = {
-    autoHideDialog: true,
+    dialogPinned: false,
     base_url: 'https://api.freewife.online',
     api_key: '',
     model: 'deepseek-v3',
@@ -70,10 +70,10 @@ function optimizePageContent(content) {
         .trim();
     
     // 如果内容过长，进行智能截取
-    if (optimized.length > 8000) {
+    if (optimized.length > 16000) {
         // 保留开头和结尾的重要内容
-        const start = optimized.substring(0, 4000);
-        const end = optimized.substring(optimized.length - 2000);
+        const start = optimized.substring(0, 8192);
+        const end = optimized.substring(optimized.length - 4096);
         optimized = start + '\n\n[... 中间内容已省略 ...]\n\n' + end;
     }
     
@@ -94,7 +94,14 @@ function shouldIncludePageContent(tabId, pageContent, question, history) {
     }
     
     // 检查问题是否与网页内容相关
-    const contentRelatedKeywords = ['页面', '网页', '内容', '文章', '这里', '这个', '上面', '下面', '显示'];
+    const contentRelatedKeywords = [
+        // 页面相关
+        '页面', '网页', '内容', '文章',
+        // 指示词
+        '这里', '这个', '上面', '下面',
+        // 动作词
+        '显示', '总结', '介绍', '根据'
+    ];
     const isContentRelated = contentRelatedKeywords.some(keyword => 
         question.toLowerCase().includes(keyword)
     );

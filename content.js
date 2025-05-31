@@ -43,6 +43,23 @@ function createDialog() {
         <div class="container">
             <div class="header">
                 <div class="header-title">Web Chat</div>
+                <div class="header-controls">
+                    <button id="pinButton" class="header-btn" title="置顶">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M16,12V4H17V2H7V4H8V12L6,14V16H11.2V22H12.8V16H18V14L16,12Z"/>
+                        </svg>
+                    </button>
+                    <button id="resetSizeButton" class="header-btn" title="恢复默认窗口大小">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M4,4H20A2,2 0 0,1 22,6V18A2,2 0 0,1 20,20H4A2,2 0 0,1 2,18V6A2,2 0 0,1 4,4M4,6V18H20V6H4Z"/>
+                        </svg>
+                    </button>
+                    <button id="closeButton" class="header-btn" title="关闭">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"/>
+                        </svg>
+                    </button>
+                </div>
             </div>
             <div id="chat-container" class="chat-container">
                 <div id="messages" class="messages"></div>
@@ -53,7 +70,14 @@ function createDialog() {
                 </button>
             </div>
         </div>
-        <div class="resize-handle"></div>
+        <div class="resize-handle resize-se"></div>
+        <div class="resize-handle resize-n"></div>
+        <div class="resize-handle resize-s"></div>
+        <div class="resize-handle resize-w"></div>
+        <div class="resize-handle resize-e"></div>
+        <div class="resize-handle resize-nw"></div>
+        <div class="resize-handle resize-ne"></div>
+        <div class="resize-handle resize-sw"></div>
     `;
 
     const container = dialog.querySelector('.container');
@@ -70,7 +94,7 @@ function createDialog() {
     document.body.appendChild(overlay);
 
     header.addEventListener('mousedown', (e) => {
-        if (e.target.closest('.toggle-ball')) return;
+        if (e.target.closest('.toggle-ball') || e.target.closest('.header-btn')) return;
 
         isDragging = true;
         dialog.style.transition = 'none';
@@ -120,7 +144,10 @@ function createDialog() {
             chrome.storage.sync.set({
                 dialogPosition: {
                     left: dialog.style.left,
-                    top: dialog.style.top
+                    top: dialog.style.top,
+                    right: dialog.style.right,
+                    bottom: dialog.style.bottom,
+                    isCustomPosition: true
                 }
             });
         }
@@ -130,35 +157,65 @@ function createDialog() {
         dialogPosition: {
             left: 'auto',
             top: 'auto',
+            right: '80px',
+            bottom: '20px',
             isCustomPosition: false
         }
     }, (items) => {
         if (items.dialogPosition.isCustomPosition) {
-            dialog.style.left = items.dialogPosition.left;
-            dialog.style.top = items.dialogPosition.top;
+            if (items.dialogPosition.left !== 'auto') {
+                dialog.style.left = items.dialogPosition.left;
+                dialog.style.right = 'auto';
+            } else if (items.dialogPosition.right !== 'auto') {
+                dialog.style.right = items.dialogPosition.right;
+                dialog.style.left = 'auto';
+            }
+            
+            if (items.dialogPosition.top !== 'auto') {
+                dialog.style.top = items.dialogPosition.top;
+                dialog.style.bottom = 'auto';
+            } else if (items.dialogPosition.bottom !== 'auto') {
+                dialog.style.bottom = items.dialogPosition.bottom;
+                dialog.style.top = 'auto';
+            }
         }
     });
 
-    const resizeHandle = dialog.querySelector('.resize-handle');
+    // 缩放功能实现
+    const resizeHandles = dialog.querySelectorAll('.resize-handle');
+    let currentResizeType = null;
+    let resizeInitialRect = null;
 
-    resizeHandle.addEventListener('mousedown', (e) => {
-        isResizing = true;
-        dialog.style.transition = 'none';
-        resizeInitialWidth = dialog.offsetWidth;
-        resizeInitialHeight = dialog.offsetHeight;
-        resizeInitialX = e.clientX;
-        resizeInitialY = e.clientY;
+    resizeHandles.forEach(handle => {
+        handle.addEventListener('mousedown', (e) => {
+            isResizing = true;
+            dialog.style.transition = 'none';
+            
+            // 获取缩放类型
+            currentResizeType = handle.classList[1]; // resize-se, resize-n, etc.
+            
+            // 记录初始状态
+            const rect = dialog.getBoundingClientRect();
+            resizeInitialRect = {
+                left: rect.left,
+                top: rect.top,
+                width: rect.width,
+                height: rect.height
+            };
+            resizeInitialX = e.clientX;
+            resizeInitialY = e.clientY;
 
-        document.addEventListener('mousemove', handleResize);
-        document.addEventListener('mouseup', stopResize);
+            document.addEventListener('mousemove', handleResize);
+            document.addEventListener('mouseup', stopResize);
 
-        e.preventDefault();
-        e.stopPropagation();
+            e.preventDefault();
+            e.stopPropagation();
+        });
     });
 
     let resizeAnimationFrame;
     function handleResize(e) {
-        if (!isResizing) return;
+        if (!isResizing || !currentResizeType) return;
 
         if (resizeAnimationFrame) {
             cancelAnimationFrame(resizeAnimationFrame);
@@ -167,24 +224,102 @@ function createDialog() {
         resizeAnimationFrame = requestAnimationFrame(() => {
             const deltaX = e.clientX - resizeInitialX;
             const deltaY = e.clientY - resizeInitialY;
+            
+            let newLeft = resizeInitialRect.left;
+            let newTop = resizeInitialRect.top;
+            let newWidth = resizeInitialRect.width;
+            let newHeight = resizeInitialRect.height;
 
-            const newWidth = Math.max(300, resizeInitialWidth + deltaX);
-            const newHeight = Math.max(400, resizeInitialHeight + deltaY);
+            // 根据缩放类型计算新的尺寸和位置
+            switch (currentResizeType) {
+                case 'resize-se': // 右下角
+                    newWidth = resizeInitialRect.width + deltaX;
+                    newHeight = resizeInitialRect.height + deltaY;
+                    break;
+                case 'resize-nw': // 左上角
+                    newLeft = resizeInitialRect.left + deltaX;
+                    newTop = resizeInitialRect.top + deltaY;
+                    newWidth = resizeInitialRect.width - deltaX;
+                    newHeight = resizeInitialRect.height - deltaY;
+                    break;
+                case 'resize-ne': // 右上角
+                    newTop = resizeInitialRect.top + deltaY;
+                    newWidth = resizeInitialRect.width + deltaX;
+                    newHeight = resizeInitialRect.height - deltaY;
+                    break;
+                case 'resize-sw': // 左下角
+                    newLeft = resizeInitialRect.left + deltaX;
+                    newWidth = resizeInitialRect.width - deltaX;
+                    newHeight = resizeInitialRect.height + deltaY;
+                    break;
+                case 'resize-n': // 上边
+                    newTop = resizeInitialRect.top + deltaY;
+                    newHeight = resizeInitialRect.height - deltaY;
+                    break;
+                case 'resize-s': // 下边
+                    newHeight = resizeInitialRect.height + deltaY;
+                    break;
+                case 'resize-w': // 左边
+                    newLeft = resizeInitialRect.left + deltaX;
+                    newWidth = resizeInitialRect.width - deltaX;
+                    break;
+                case 'resize-e': // 右边
+                    newWidth = resizeInitialRect.width + deltaX;
+                    break;
+            }
 
-            const rect = dialog.getBoundingClientRect();
-            const maxWidth = window.innerWidth - rect.left - 20;
-            const maxHeight = window.innerHeight - rect.top - 20;
+            // 应用最小尺寸限制
+            if (newWidth < RESIZE_MIN_WIDTH) {
+                if (currentResizeType.includes('w')) {
+                    newLeft = resizeInitialRect.left + resizeInitialRect.width - RESIZE_MIN_WIDTH;
+                }
+                newWidth = RESIZE_MIN_WIDTH;
+            }
+            if (newHeight < RESIZE_MIN_HEIGHT) {
+                if (currentResizeType.includes('n')) {
+                    newTop = resizeInitialRect.top + resizeInitialRect.height - RESIZE_MIN_HEIGHT;
+                }
+                newHeight = RESIZE_MIN_HEIGHT;
+            }
 
-            const finalWidth = Math.min(newWidth, maxWidth);
-            const finalHeight = Math.min(newHeight, maxHeight);
+            // 边界检查
+            const maxWidth = window.innerWidth - newLeft - 20;
+            const maxHeight = window.innerHeight - newTop - 20;
+            
+            if (newLeft < 20) {
+                if (currentResizeType.includes('w')) {
+                    newWidth = newWidth - (20 - newLeft);
+                    newLeft = 20;
+                }
+            }
+            if (newTop < 20) {
+                if (currentResizeType.includes('n')) {
+                    newHeight = newHeight - (20 - newTop);
+                    newTop = 20;
+                }
+            }
+            
+            newWidth = Math.min(newWidth, maxWidth);
+            newHeight = Math.min(newHeight, maxHeight);
 
-            dialog.style.width = `${finalWidth}px`;
-            dialog.style.height = `${finalHeight}px`;
+            // 应用新的尺寸和位置
+            dialog.style.left = `${newLeft}px`;
+            dialog.style.top = `${newTop}px`;
+            dialog.style.width = `${newWidth}px`;
+            dialog.style.height = `${newHeight}px`;
 
+            // 保存到存储
             chrome.storage.sync.set({
                 dialogSize: {
-                    width: finalWidth,
-                    height: finalHeight
+                    width: newWidth,
+                    height: newHeight
+                },
+                dialogPosition: {
+                    left: `${newLeft}px`,
+                    top: `${newTop}px`,
+                    right: 'auto',
+                    bottom: 'auto',
+                    isCustomPosition: true
                 }
             });
         });
@@ -193,6 +328,8 @@ function createDialog() {
     function stopResize() {
         if (isResizing) {
             isResizing = false;
+            currentResizeType = null;
+            resizeInitialRect = null;
             dialog.style.transition = '';
             document.removeEventListener('mousemove', handleResize);
             document.removeEventListener('mouseup', stopResize);
@@ -215,14 +352,98 @@ function createDialog() {
 
     document.body.appendChild(dialog);
 
+    // 添加按钮事件监听器
+    const pinButton = dialog.querySelector('#pinButton');
+    const resetSizeButton = dialog.querySelector('#resetSizeButton');
+    const closeButton = dialog.querySelector('#closeButton');
+    
+    // 置顶按钮功能
+    let isPinned = false;
+    if (pinButton) {
+        // 从存储中获取置顶状态
+        chrome.storage.sync.get({ dialogPinned: false }, (items) => {
+            isPinned = items.dialogPinned;
+            updatePinButtonState();
+        });
+        
+        pinButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            isPinned = !isPinned;
+            chrome.storage.sync.set({ 
+                dialogPinned: isPinned
+            });
+            updatePinButtonState();
+        });
+    }
+    
+    function updatePinButtonState() {
+        if (pinButton) {
+            pinButton.style.opacity = isPinned ? '1' : '0.7';
+            pinButton.style.backgroundColor = isPinned ? 'rgba(255, 255, 255, 0.3)' : 'transparent';
+            pinButton.title = isPinned ? '取消置顶' : '置顶';
+        }
+    }
+    
+    // 恢复默认大小按钮功能
+    if (resetSizeButton) {
+        resetSizeButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            
+            // 恢复默认尺寸
+            dialog.style.width = '500px';
+            dialog.style.height = '500px';
+            
+            // 基于最右下角定位：悬浮球贴右边，对话窗口贴最下方和悬浮球
+            dialog.style.left = 'auto';
+            dialog.style.top = 'auto';
+            dialog.style.right = '80px'; // 悬浮球宽度(60px) + 间距(20px)
+            dialog.style.bottom = '20px'; // 与悬浮球底部对齐
+            
+            // 同时恢复悬浮球到默认位置（右下角）
+            const ballContainer = document.querySelector('.ball-container');
+            if (ballContainer) {
+                ballContainer.style.right = '20px';
+                ballContainer.style.bottom = '20px';
+                ballContainer.style.left = 'auto';
+                ballContainer.style.top = 'auto';
+                
+                // 移除边缘状态
+                const ball = ballContainer.querySelector('#ai-assistant-ball');
+                if (ball) {
+                    ball.classList.remove('edge-left', 'edge-right', 'edge-top', 'edge-bottom');
+                }
+                
+                // 保存悬浮球位置
+                chrome.storage.sync.set({
+                    ballPosition: { right: '20px', bottom: '20px', left: 'auto', top: 'auto', edge: null }
+                });
+            }
+            
+            // 保存默认设置
+            chrome.storage.sync.set({
+                dialogSize: { width: 500, height: 500 },
+                dialogPosition: { left: 'auto', top: 'auto', right: '80px', bottom: '20px', isCustomPosition: false }
+            });
+        });
+    }
+    
+    // 关闭按钮功能
+    if (closeButton) {
+        closeButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            dialog.classList.remove('show');
+        });
+    }
+
     document.addEventListener('mousedown', async (e) => {
         const ball = document.getElementById('ai-assistant-ball');
 
         const settings = await chrome.storage.sync.get({
-            autoHideDialog: true
+            dialogPinned: false
         });
 
-        if (settings.autoHideDialog &&
+        // 如果对话框被置顶，则不自动隐藏
+        if (!settings.dialogPinned &&
             dialog.classList.contains('show') &&
             !dialog.contains(e.target) &&
             (!ball || !ball.contains(e.target))) {
@@ -522,6 +743,10 @@ function createFloatingBall() {
 // 全局变量声明
 let dialogInstance = null;  // 对话框实例
 let ballInstance = null;    // 悬浮球实例
+
+// 缩放控制全局变量
+const RESIZE_MIN_WIDTH = 500;   // 最小宽度
+const RESIZE_MIN_HEIGHT = 400;  // 最小高度
 /**
  * 初始化Marked.js库用于Markdown渲染
  * 等待库加载完成并配置渲染选项

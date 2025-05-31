@@ -1,7 +1,6 @@
 // ==================== 配置常量 ====================
 
 const DEFAULT_SETTINGS = {
-    autoHideDialog: true,
     base_url: 'https://api.freewife.online',
     api_key: '',
     model: 'deepseek-v3',
@@ -229,7 +228,6 @@ async function saveSettings(testApi = false) {
         api_key: document.getElementById('api_key').value.trim(),
         base_url: baseUrlValue || DEFAULT_SETTINGS.base_url,
         model: document.getElementById('model').value.trim(),
-        autoHideDialog: document.getElementById('autoHideDialog')?.checked ?? true,
         enableContext: document.getElementById('enableContext')?.checked ?? true,
         stream: document.getElementById('stream')?.checked ?? true,
 
@@ -273,13 +271,7 @@ function loadOptions() {
         system_prompt: ''
     }, (items) => {
         
-        // 1. autoHideDialog (界面设置)
-        const autoHideDialog = document.getElementById('autoHideDialog');
-        if (autoHideDialog) {
-            autoHideDialog.checked = items.autoHideDialog;
-        }
-        
-        // 2. API设置
+        // 1. API设置
         document.getElementById('base_url').value = items.base_url;
         document.getElementById('api_key').value = items.api_key;
         document.getElementById('model').value = items.model;
@@ -322,10 +314,7 @@ async function resetOptions() {
 
         // 按HTML顺序更新UI
         
-        // 1. 界面设置
-        document.getElementById('autoHideDialog').checked = true;
-        
-        // 2. API设置
+        // 1. API设置
         document.getElementById('base_url').value = DEFAULT_SETTINGS.base_url;
         document.getElementById('api_key').value = DEFAULT_SETTINGS.api_key;
         document.getElementById('model').value = DEFAULT_SETTINGS.model;
@@ -360,15 +349,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 按HTML元素出现顺序设置事件监听器
     
-    // 1. autoHideDialog (界面设置)
-    const autoHideDialog = document.getElementById('autoHideDialog');
-    if (autoHideDialog) {
-        autoHideDialog.addEventListener('change', () => {
-            chrome.storage.sync.set({ autoHideDialog: autoHideDialog.checked });
-        });
-    }
-    
-    // 2. API设置事件
+    // 1. API设置事件
     // base_url
     const baseUrl = document.getElementById('base_url');
     if (baseUrl) {
