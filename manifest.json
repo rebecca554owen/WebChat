@@ -33,10 +33,10 @@
             ],
             "js": [
                 "lib/marked.min.js",
-                "content.js"
+                "content/content.js"
             ],
             "css": [
-                "content.css"
+                "content/content.css"
             ]
         }
     ],
