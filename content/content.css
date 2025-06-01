@@ -689,6 +689,89 @@
     padding: 0;
 }
 
+/* 代码块增强样式 */
+#ai-assistant-dialog .message pre.code-block-processed {
+    position: relative;
+}
+
+#ai-assistant-dialog .message .code-language-label {
+    position: absolute;
+    top: 8px;
+    right: 60px;
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-family: 'Courier New', monospace;
+    text-transform: uppercase;
+    z-index: 1;
+}
+
+#ai-assistant-dialog .message .code-copy-button {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    z-index: 1;
+}
+
+#ai-assistant-dialog .message .code-copy-button:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+#ai-assistant-dialog .message .code-copy-button:active {
+    transform: scale(0.95);
+}
+
+/* 消息整体复制按钮样式 */
+#ai-assistant-dialog .message.assistant-message {
+    position: relative;
+}
+
+#ai-assistant-dialog .message .message-copy-button {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 6px;
+    width: 32px;
+    height: 32px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    z-index: 2;
+    opacity: 0;
+    transform: translateY(-4px);
+}
+
+#ai-assistant-dialog .message.assistant-message:hover .message-copy-button {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+#ai-assistant-dialog .message .message-copy-button:hover {
+    background: rgba(255, 255, 255, 1);
+    border-color: rgba(0, 0, 0, 0.2);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+#ai-assistant-dialog .message .message-copy-button:active {
+    transform: scale(0.95);
+}
+
 #ai-assistant-dialog .message blockquote {
     border-left: 4px solid #667eea;
     margin: 12px 0;

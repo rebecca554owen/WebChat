@@ -1008,6 +1008,74 @@ let ballInstance = null;    // 悬浮球实例
 const RESIZE_MIN_WIDTH = 500;   // 最小宽度
 const RESIZE_MIN_HEIGHT = 400;  // 最小高度
 /**
+ * 处理代码块的后渲染逻辑
+ * 为代码块添加语法高亮、复制按钮等功能，为AI消息添加整体复制按钮
+ * @param {HTMLElement} container - 包含代码块的容器元素
+ */
+function processCodeBlocks(container) {
+    // 处理代码块
+    const codeBlocks = container.querySelectorAll('pre > code');
+    codeBlocks.forEach(codeElement => {
+        const preElement = codeElement.parentElement;
+        
+        // 添加代码块样式类
+        if (!preElement.classList.contains('code-block-processed')) {
+            preElement.classList.add('code-block-processed');
+            
+            // 检测语言类型
+            const className = codeElement.className;
+            const languageMatch = className.match(/language-(\w+)/);
+            const language = languageMatch ? languageMatch[1] : 'text';
+            
+            // 添加语言标签
+            if (language !== 'text') {
+                const languageLabel = document.createElement('div');
+                languageLabel.className = 'code-language-label';
+                languageLabel.textContent = language;
+                preElement.insertBefore(languageLabel, codeElement);
+            }
+            
+            // 添加复制按钮
+            const copyButton = document.createElement('button');
+            copyButton.className = 'code-copy-button';
+            copyButton.textContent = '复制';
+            copyButton.onclick = () => {
+                navigator.clipboard.writeText(codeElement.textContent).then(() => {
+                    copyButton.textContent = '已复制';
+                    setTimeout(() => {
+                        copyButton.textContent = '复制';
+                    }, 2000);
+                });
+            };
+            preElement.appendChild(copyButton);
+        }
+    });
+    
+    // 为AI消息添加整体复制按钮
+    if (container.classList.contains('assistant-message') && !container.querySelector('.message-copy-button')) {
+        const messageCopyButton = document.createElement('button');
+        messageCopyButton.className = 'message-copy-button';
+        messageCopyButton.innerHTML = '📋';
+        messageCopyButton.title = '复制整个回答';
+        messageCopyButton.onclick = () => {
+            const markdownContent = container.dataset.markdownContent || container.textContent;
+            navigator.clipboard.writeText(markdownContent).then(() => {
+                messageCopyButton.innerHTML = '✅';
+                setTimeout(() => {
+                    messageCopyButton.innerHTML = '📋';
+                }, 2000);
+            }).catch(() => {
+                messageCopyButton.innerHTML = '❌';
+                setTimeout(() => {
+                    messageCopyButton.innerHTML = '📋';
+                }, 2000);
+            });
+        };
+        container.appendChild(messageCopyButton);
+    }
+}
+
+/**
  * 初始化Marked.js库用于Markdown渲染
  * 等待库加载完成并配置渲染选项
  * @returns {Function} Markdown解析函数，失败时返回原文本函数
@@ -1028,14 +1096,21 @@ async function initMarked() {
             });
         }
 
-        marked.setOptions({
+        // 配置marked选项 (v15版本)
+        marked.use({
             breaks: true,
-            gfm: true,
-            headerIds: false,
-            mangle: false
+            gfm: true
         });
 
-        return marked.parse;
+        // 返回包装的解析函数
+        return (text) => {
+            try {
+                return marked.parse(text);
+            } catch (error) {
+                console.error('Markdown解析错误:', error);
+                return text;
+            }
+        };
     } catch (error) {
         console.error('Marked初始化失败:', error);
         return text => text;
@@ -1319,6 +1394,7 @@ async function initializeDialog(dialog) {
 
                         try {
                             messageDiv.innerHTML = markedInstance(msg.markdownContent || msg.content);
+                            processCodeBlocks(messageDiv);
                         } catch (error) {
                             console.error('Markdown渲染失败:', error);
                             messageDiv.textContent = msg.content;
@@ -1351,6 +1427,7 @@ async function initializeDialog(dialog) {
                 messageDiv.dataset.markdownContent = content;
                 try {
                     messageDiv.innerHTML = markedInstance(content);
+                    processCodeBlocks(messageDiv);
                 } catch (error) {
                     console.error('Markdown渲染失败:', error);
                     messageDiv.textContent = content;
@@ -1434,6 +1511,7 @@ async function initializeDialog(dialog) {
                             try {
                                 messageDiv.dataset.markdownContent = msg.markdownContent || currentAnswer;
                                 messageDiv.innerHTML = markedInstance(currentAnswer);
+                                processCodeBlocks(messageDiv);
                             } catch (error) {
                                 messageDiv.textContent = currentAnswer;
                             }
