@@ -871,7 +871,7 @@ function showNotification(message) {
         background: rgba(0, 0, 0, 0.8);
         color: white;
         border-radius: 4px;
-        z-index: 10000;
+        z-index: 1001;
         font-size: 14px;
         box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
         animation: fadeInOut 3s ease forwards;
@@ -910,7 +910,7 @@ async function sendMessageWithRetry(message, maxRetries = 3) {
                         background: rgba(0, 0, 0, 0.8);
                         color: white;
                         border-radius: 4px;
-                        z-index: 10000;
+                        z-index: 1001;
                         font-size: 14px;
                         box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
                     `;

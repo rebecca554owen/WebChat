@@ -138,7 +138,8 @@
     background: white;
     border-radius: 12px;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
-    z-index: 10000;
+    /* 降低z-index值，避免过度覆盖网页内容 */
+    z-index: 1000;
     display: flex;
     flex-direction: column;
     opacity: 0;
@@ -587,15 +588,20 @@
     width: 100%;
     height: 100%;
     background: transparent;
-    z-index: 9999;
+    /* 调整z-index与对话框保持一致 */
+    z-index: 999;
     pointer-events: none;
     opacity: 0;
     transition: opacity 0.3s ease;
+    /* 确保遮罩层不会影响页面内容的可见性 */
+    visibility: hidden;
 }
 
 .dialog-overlay.dragging {
     pointer-events: all;
-    opacity: 1;
+    /* 移除opacity设置，避免影响页面内容 */
+    /* opacity: 1; */
+    visibility: visible;
 }
 
 /* ========================================
@@ -613,7 +619,8 @@
     background: rgba(0, 0, 0, 0.9);
     color: white;
     border-radius: 8px;
-    z-index: 10003;
+    /* 调整z-index为合理值，确保通知显示在对话框之上 */
+    z-index: 1002;
     font-size: 14px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
     max-width: 300px;
