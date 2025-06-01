@@ -1,28 +1,205 @@
 /**
- * 解析网页内容，提取纯文本内容用于AI分析
- * 移除脚本、样式、导航、页脚等非内容元素
- * @returns {string} 清理后的网页文本内容
+ * 解析网页内容，提取符合人类阅读习惯的结构化文本内容用于AI分析
+ * 移除脚本、样式、导航、页脚等非内容元素，保留文档结构
+ * @returns {string} 清理后的结构化网页文本内容
  */
 function parseWebContent() {
     const docClone = document.cloneNode(true);
-    const scripts = docClone.querySelectorAll('script');
-    const styles = docClone.querySelectorAll('style, link[rel="stylesheet"]');
-    const headers = docClone.querySelectorAll('header, nav');
-    const footers = docClone.querySelectorAll('footer');
-    const chatDialog = docClone.querySelectorAll('#ai-assistant-dialog');
-
-    [...scripts, ...styles, ...headers, ...footers, ...chatDialog].forEach(element => {
+    
+    // 移除不需要的元素
+    const unwantedElements = docClone.querySelectorAll(
+        'script, style, link[rel="stylesheet"], header, nav, footer, aside, ' +
+        '.advertisement, .ads, .sidebar, .menu, .navigation, ' +
+        '#ai-assistant-dialog, [class*="cookie"], [class*="popup"], ' +
+        '.social-share, .related-posts, .comments'
+    );
+    
+    unwantedElements.forEach(element => {
         if (element.parentNode) {
             element.parentNode.removeChild(element);
         }
     });
-
-    const mainContent = docClone.querySelector('body');
-    const textContent = mainContent ? mainContent.innerText : '';
-
-    return textContent
-        .replace(/\s+/g, ' ')
+    
+    // 智能选择主要内容区域
+    const contentSelectors = [
+        'main', 'article', '.content', '.main-content', '.post-content',
+        '.entry-content', '[role="main"]', '.article-body', '.page-content'
+    ];
+    
+    let mainContent = null;
+    for (const selector of contentSelectors) {
+        const candidate = docClone.querySelector(selector);
+        if (candidate && candidate.textContent.trim().length > 100) {
+            mainContent = candidate;
+            break;
+        }
+    }
+    
+    if (!mainContent) {
+        mainContent = docClone.querySelector('body');
+    }
+    
+    // 提取结构化文本
+    let structuredText = extractStructuredText(mainContent);
+    
+    // 过滤无关内容
+    structuredText = filterRelevantContent(structuredText);
+    
+    // 最终清理
+    return structuredText
+        .replace(/\n{3,}/g, '\n\n') // 限制连续换行
+        .replace(/[ \t]{2,}/g, ' ') // 合并多余空格
         .trim();
+}
+
+/**
+ * 提取结构化文本，保留文档层次结构
+ * @param {Element} element 要处理的DOM元素
+ * @returns {string} 结构化文本
+ */
+function extractStructuredText(element) {
+    if (!element) return '';
+    
+    let result = '';
+    
+    function processNode(node) {
+        if (node.nodeType === Node.TEXT_NODE) {
+            const text = node.textContent.trim();
+            if (text) {
+                result += text + ' ';
+            }
+        } else if (node.nodeType === Node.ELEMENT_NODE) {
+            const tagName = node.tagName.toLowerCase();
+            
+            // 跳过隐藏元素
+            const style = window.getComputedStyle(node);
+            if (style.display === 'none' || style.visibility === 'hidden') {
+                return;
+            }
+            
+            // 为不同元素添加适当的分隔符
+            switch (tagName) {
+                case 'h1':
+                case 'h2':
+                case 'h3':
+                case 'h4':
+                case 'h5':
+                case 'h6':
+                    result += '\n\n# ';
+                    break;
+                case 'p':
+                case 'div':
+                    if (node.textContent.trim()) {
+                        result += '\n\n';
+                    }
+                    break;
+                case 'br':
+                    result += '\n';
+                    return; // br元素不需要处理子节点
+                case 'li':
+                    result += '\n• ';
+                    break;
+                case 'blockquote':
+                    result += '\n> ';
+                    break;
+                case 'pre':
+                case 'code':
+                    result += '\n```\n';
+                    break;
+                case 'table':
+                    result += '\n\n[表格内容]\n';
+                    break;
+                case 'img':
+                    const alt = node.getAttribute('alt');
+                    if (alt) {
+                        result += `[图片: ${alt}] `;
+                    }
+                    return; // img元素不需要处理子节点
+                case 'a':
+                    const href = node.getAttribute('href');
+                    if (href && !href.startsWith('#')) {
+                        // 处理链接文本
+                        const linkText = node.textContent.trim();
+                        if (linkText) {
+                            result += `[${linkText}]`;
+                        }
+                        return; // 已处理链接文本，不需要递归
+                    }
+                    break;
+            }
+            
+            // 递归处理子节点
+            for (const child of node.childNodes) {
+                processNode(child);
+            }
+            
+            // 某些元素后添加换行
+            if (['p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'blockquote', 'pre'].includes(tagName)) {
+                if (node.textContent.trim()) {
+                    result += '\n';
+                }
+            }
+            
+            if (tagName === 'pre' || tagName === 'code') {
+                result += '\n```\n';
+            }
+        }
+    }
+    
+    processNode(element);
+    
+    return result;
+}
+
+/**
+ * 过滤无关内容，保留有价值的文本
+ * @param {string} text 原始文本
+ * @returns {string} 过滤后的文本
+ */
+function filterRelevantContent(text) {
+    const lines = text.split('\n');
+    const filteredLines = [];
+    
+    for (const line of lines) {
+        const trimmed = line.trim();
+        
+        // 跳过过短的行
+        if (trimmed.length < 2) {
+            if (trimmed === '') {
+                filteredLines.push(line); // 保留空行用于格式
+            }
+            continue;
+        }
+        
+        // 跳过可能是导航或菜单的行
+        if (/^(首页|主页|关于我们?|联系我们?|登录|注册|搜索|更多|下一页|上一页|返回|回到顶部)$/i.test(trimmed)) {
+            continue;
+        }
+        
+        // 跳过版权信息
+        if (/copyright|©|版权所有|保留所有权利|all rights reserved/i.test(trimmed)) {
+            continue;
+        }
+        
+        // 跳过纯数字日期
+        if (/^\d{4}[-/年]\d{1,2}[-/月]\d{1,2}[日]?$/.test(trimmed)) {
+            continue;
+        }
+        
+        // 跳过社交媒体分享文本
+        if (/^(分享到|分享|点赞|收藏|转发|微博|微信|QQ|Facebook|Twitter)$/i.test(trimmed)) {
+            continue;
+        }
+        
+        // 跳过广告相关文本
+        if (/^(广告|推广|赞助|Advertisement|Sponsored)$/i.test(trimmed)) {
+            continue;
+        }
+        
+        filteredLines.push(line);
+    }
+    
+    return filteredLines.join('\n');
 }
 
 /**
