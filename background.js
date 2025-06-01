@@ -142,6 +142,24 @@ function buildMessages(settings, pageContent, question, history = [], tabId = nu
         });
     }
     
+    // 添加系统时间上下文
+    const currentTime = new Date();
+    const timeString = currentTime.toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        weekday: 'long',
+        timeZone: 'Asia/Shanghai'
+    });
+    
+    messages.push({
+        role: "system",
+        content: `当前时间：(UTC+8) ${timeString} , 注意时区问题`
+    });
+    
     // 智能添加网页内容上下文
     if (pageContent && needsPageContext) {
         // 检查是否需要发送网页内容
@@ -168,7 +186,16 @@ function buildMessages(settings, pageContent, question, history = [], tabId = nu
     // 开启对话历史记录功能
     if (settings.enableContext && history.length > 0) {
         const maxRounds = 4;
-        const recentHistory = history.slice(-maxRounds * 2); // 每轮包含用户和助手消息
+        let historyToUse = history;
+        
+        // 检查历史记录的最后一条是否是当前用户问题，如果是则排除避免重复
+        if (history.length > 0 && 
+            history[history.length - 1].isUser && 
+            history[history.length - 1].content === question) {
+            historyToUse = history.slice(0, -1);
+        }
+        
+        const recentHistory = historyToUse.slice(-maxRounds * 2); // 每轮包含用户和助手消息
         
         recentHistory.forEach(msg => {
             messages.push({
@@ -514,7 +541,7 @@ async function handleGenerateAnswer(msg, port) {
         const history = getTabHistory(tabId);
         
         // 构建消息
-        const messages = buildMessages(settings, parseWebContent(pageContent), question, history.slice(0, -1), tabId, true);
+        const messages = buildMessages(settings, parseWebContent(pageContent), question, history, tabId, true);
         
         let fullAnswer = '';
         

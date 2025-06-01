@@ -126,6 +126,26 @@ function extractStructuredText(element) {
                         return; // 已处理链接文本，不需要递归
                     }
                     break;
+                case 'time':
+                case 'relative-time':
+                    // 处理时间元素，优先使用datetime属性中的完整时间信息
+                    const datetime = node.getAttribute('datetime');
+                    const title = node.getAttribute('title');
+                    const textContent = node.textContent.trim();
+                    
+                    if (datetime) {
+                        // 如果有datetime属性，使用完整的ISO时间格式
+                        result += `${textContent} (${datetime})`;
+                    } else if (title) {
+                        // 如果有title属性，也包含进去
+                        result += `${textContent} (${title})`;
+                    } else {
+                        // 否则只使用文本内容
+                        result += textContent;
+                    }
+                    result += ' ';
+                    return; // 时间元素不需要递归处理子节点
+                    break;
             }
             
             // 递归处理子节点
@@ -178,11 +198,6 @@ function filterRelevantContent(text) {
         
         // 跳过版权信息
         if (/copyright|©|版权所有|保留所有权利|all rights reserved/i.test(trimmed)) {
-            continue;
-        }
-        
-        // 跳过纯数字日期
-        if (/^\d{4}[-/年]\d{1,2}[-/月]\d{1,2}[日]?$/.test(trimmed)) {
             continue;
         }
         
