@@ -136,6 +136,12 @@ function extractStructuredTextOptimized(element) {
                 case 'table':
                     result += '\n\n[表格内容]\n';
                     break;
+                case 'img':
+                    const alt = node.getAttribute('alt');
+                    if (alt) {
+                        result += `${alt} `;
+                    }
+                    return; // img元素不需要处理子节点
                 case 'a':
                     const href = node.getAttribute('href');
                     if (href && !href.startsWith('#')) {
@@ -147,12 +153,6 @@ function extractStructuredTextOptimized(element) {
                         return; // 已处理链接文本，不需要递归
                     }
                     break;
-                    case 'img':
-                        const alt = node.getAttribute('alt');
-                        if (alt) {
-                            result += `${alt} `;
-                        }
-                        return; // img元素不需要处理子节点
                 case 'time':
                     // 处理时间元素，优先使用datetime属性中的完整时间信息
                     const datetime = node.getAttribute('datetime');
@@ -172,6 +172,61 @@ function extractStructuredTextOptimized(element) {
                     result += ' ';
                     return; // 时间元素不需要递归处理子节点
                     break;
+                default:
+                    // 其他元素，使用默认分隔符
+                    result += '\n';
+                    break;
+            }
+            
+            // 特殊处理哪吒面板统计卡片（合并处理逻辑）
+            if (node.tagName) {
+                // 处理 number-flow 元素和带 aria-label 的元素
+                if (node.tagName.toLowerCase().includes('number-flow') || node.hasAttribute('aria-label')) {
+                    const ariaLabel = node.getAttribute('aria-label');
+                    if (ariaLabel) {
+                        result += ariaLabel;
+                        return; // 不需要递归处理子节点
+                    }
+                }
+                
+                // 处理哪吒面板统计卡片的 div 容器
+                if (tagName === 'div' && node.className && typeof node.className === 'string') {
+                    // 检查是否是统计卡片的容器
+                    if (node.className.includes('rounded-lg') && node.className.includes('border')) {
+                        // 检测状态指示器圆点
+                        const statusIndicator = node.querySelector('span[class*="h-2"][class*="w-2"][class*="rounded-full"]');
+                        let statusText = '';
+                        
+                        if (statusIndicator && statusIndicator.className) {
+                            if (statusIndicator.className.includes('bg-green-500')) {
+                                statusText = '[在线] ';
+                            } else if (statusIndicator.className.includes('bg-red-500')) {
+                                statusText = '[离线] ';
+                            }
+                        }
+                        
+                        const titleElement = node.querySelector('p[class*="text-sm"], p[class*="font-medium"]');
+                        const numberElement = node.querySelector('div[class*="text-lg"], div[class*="font-semibold"]');
+                        
+                        if (titleElement && numberElement) {
+                            const title = titleElement.textContent.trim();
+                            const number = numberElement.textContent.trim();
+                            if (title && number && /^\d+/.test(number)) {
+                                result += `\n${statusText}${title}: ${number}\n`;
+                                return; // 已处理完整卡片，不需要递归
+                            }
+                        }
+                        
+                        // 如果只有状态指示器但没有标准的标题和数字结构，仍然提取状态信息
+                        if (statusText && !titleElement) {
+                            const cardText = node.textContent.trim();
+                            if (cardText) {
+                                result += `\n${statusText}${cardText}\n`;
+                                return;
+                            }
+                        }
+                    }
+                }
             }
             
             // 递归处理子节点
