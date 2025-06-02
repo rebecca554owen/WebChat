@@ -712,24 +712,33 @@
     position: absolute;
     top: 8px;
     right: 8px;
-    background: rgba(255, 255, 255, 0.1);
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: #ffffff;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    padding: 4px 8px;
-    border-radius: 4px;
+    border: 1px solid rgba(102, 126, 234, 0.3);
+    padding: 6px 12px;
+    border-radius: 6px;
     font-size: 12px;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.3s ease;
     z-index: 1;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    opacity: 0;
+    transform: translateY(-4px);
+}
+
+#ai-assistant-dialog .message pre.code-block-processed:hover .code-copy-button {
+    opacity: 1;
+    transform: translateY(0);
 }
 
 #ai-assistant-dialog .message .code-copy-button:hover {
-    background: rgba(255, 255, 255, 0.2);
-    border-color: rgba(255, 255, 255, 0.3);
+    background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.5);
+    transform: translateY(-2px);
 }
 
 #ai-assistant-dialog .message .code-copy-button:active {
-    transform: scale(0.95);
+    transform: scale(0.95) translateY(0);
 }
 
 /* 消息整体复制按钮样式 */
@@ -741,8 +750,9 @@
     position: absolute;
     top: 8px;
     right: 8px;
-    background: rgba(255, 255, 255, 0.9);
-    border: 1px solid rgba(0, 0, 0, 0.1);
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #ffffff;
+    border: 1px solid rgba(102, 126, 234, 0.3);
     border-radius: 6px;
     width: 32px;
     height: 32px;
@@ -751,10 +761,11 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.2s ease;
+    transition: all 0.3s ease;
     z-index: 2;
     opacity: 0;
     transform: translateY(-4px);
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
 }
 
 #ai-assistant-dialog .message.assistant-message:hover .message-copy-button {
@@ -763,13 +774,13 @@
 }
 
 #ai-assistant-dialog .message .message-copy-button:hover {
-    background: rgba(255, 255, 255, 1);
-    border-color: rgba(0, 0, 0, 0.2);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.5);
+    transform: translateY(-2px);
 }
 
 #ai-assistant-dialog .message .message-copy-button:active {
-    transform: scale(0.95);
+    transform: scale(0.95) translateY(0);
 }
 
 #ai-assistant-dialog .message blockquote {

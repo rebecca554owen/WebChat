@@ -1,26 +1,10 @@
 /**
  * 解析网页内容，提取符合人类阅读习惯的结构化文本内容用于AI分析
- * 移除脚本、样式、导航、页脚等非内容元素，保留文档结构
+ * 直接操作原始DOM，避免克隆开销，确保获取最新内容
  * @returns {string} 清理后的结构化网页文本内容
  */
 function parseWebContent() {
-    const docClone = document.cloneNode(true);
-    
-    // 移除不需要的元素
-    const unwantedElements = docClone.querySelectorAll(
-        'script, style, link[rel="stylesheet"], header, nav, footer, aside, ' +
-        '.advertisement, .ads, .sidebar, .menu, .navigation, ' +
-        '#ai-assistant-dialog, [class*="cookie"], [class*="popup"], ' +
-        '.social-share, .related-posts, .comments'
-    );
-    
-    unwantedElements.forEach(element => {
-        if (element.parentNode) {
-            element.parentNode.removeChild(element);
-        }
-    });
-    
-    // 智能选择主要内容区域
+    // 智能选择主要内容区域，直接从原始文档查询
     const contentSelectors = [
         'main', 'article', '.content', '.main-content', '.post-content',
         '.entry-content', '[role="main"]', '.article-body', '.page-content'
@@ -28,7 +12,7 @@ function parseWebContent() {
     
     let mainContent = null;
     for (const selector of contentSelectors) {
-        const candidate = docClone.querySelector(selector);
+        const candidate = document.querySelector(selector);
         if (candidate && candidate.textContent.trim().length > 100) {
             mainContent = candidate;
             break;
@@ -36,11 +20,11 @@ function parseWebContent() {
     }
     
     if (!mainContent) {
-        mainContent = docClone.querySelector('body');
+        mainContent = document.querySelector('body');
     }
     
-    // 提取结构化文本
-    let structuredText = extractStructuredText(mainContent);
+    // 直接提取结构化文本，跳过不需要的元素
+    let structuredText = extractStructuredTextOptimized(mainContent);
     
     // 过滤无关内容
     structuredText = filterRelevantContent(structuredText);
@@ -53,14 +37,48 @@ function parseWebContent() {
 }
 
 /**
- * 提取结构化文本，保留文档层次结构
+ * 优化版本：直接提取结构化文本，在遍历时跳过不需要的元素
  * @param {Element} element 要处理的DOM元素
  * @returns {string} 结构化文本
  */
-function extractStructuredText(element) {
+function extractStructuredTextOptimized(element) {
     if (!element) return '';
     
     let result = '';
+    
+    // 定义不需要的元素选择器
+    const unwantedSelectors = [
+        'script', 'style', 'link[rel="stylesheet"]', 'header', 'nav', 'footer', 'aside',
+        '.advertisement', '.ads', '.sidebar', '.menu', '.navigation',
+        '#ai-assistant-dialog', '[class*="cookie"]', '[class*="popup"]',
+        '.social-share', '.related-posts', '.comments'
+    ];
+    
+    function shouldSkipElement(node) {
+        if (node.nodeType !== Node.ELEMENT_NODE) return false;
+        
+        // 检查是否匹配不需要的选择器
+        for (const selector of unwantedSelectors) {
+            try {
+                if (node.matches(selector)) {
+                    return true;
+                }
+            } catch (e) {
+                // 忽略无效选择器错误
+            }
+        }
+        
+        // 检查是否包含不需要的类名
+        const className = node.className || '';
+        if (typeof className === 'string') {
+            if (className.includes('cookie') || className.includes('popup') || 
+                className.includes('advertisement') || className.includes('ads')) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
     
     function processNode(node) {
         if (node.nodeType === Node.TEXT_NODE) {
@@ -69,12 +87,21 @@ function extractStructuredText(element) {
                 result += text + ' ';
             }
         } else if (node.nodeType === Node.ELEMENT_NODE) {
+            // 跳过不需要的元素
+            if (shouldSkipElement(node)) {
+                return;
+            }
+            
             const tagName = node.tagName.toLowerCase();
             
             // 跳过隐藏元素
-            const style = window.getComputedStyle(node);
-            if (style.display === 'none' || style.visibility === 'hidden') {
-                return;
+            try {
+                const style = window.getComputedStyle(node);
+                if (style.display === 'none' || style.visibility === 'hidden') {
+                    return;
+                }
+            } catch (e) {
+                // 忽略样式计算错误，继续处理
             }
             
             // 为不同元素添加适当的分隔符
@@ -90,7 +117,7 @@ function extractStructuredText(element) {
                 case 'p':
                 case 'div':
                     if (node.textContent.trim()) {
-                        result += '\n\n';
+                            result += '\n\n';
                     }
                     break;
                 case 'br':
@@ -109,12 +136,6 @@ function extractStructuredText(element) {
                 case 'table':
                     result += '\n\n[表格内容]\n';
                     break;
-                case 'img':
-                    const alt = node.getAttribute('alt');
-                    if (alt) {
-                        result += `[图片: ${alt}] `;
-                    }
-                    return; // img元素不需要处理子节点
                 case 'a':
                     const href = node.getAttribute('href');
                     if (href && !href.startsWith('#')) {
@@ -126,8 +147,13 @@ function extractStructuredText(element) {
                         return; // 已处理链接文本，不需要递归
                     }
                     break;
+                    case 'img':
+                        const alt = node.getAttribute('alt');
+                        if (alt) {
+                            result += `${alt} `;
+                        }
+                        return; // img元素不需要处理子节点
                 case 'time':
-                case 'relative-time':
                     // 处理时间元素，优先使用datetime属性中的完整时间信息
                     const datetime = node.getAttribute('datetime');
                     const title = node.getAttribute('title');
@@ -156,7 +182,7 @@ function extractStructuredText(element) {
             // 某些元素后添加换行
             if (['p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'blockquote', 'pre'].includes(tagName)) {
                 if (node.textContent.trim()) {
-                    result += '\n';
+                        result += '\n';
                 }
             }
             
@@ -169,6 +195,16 @@ function extractStructuredText(element) {
     processNode(element);
     
     return result;
+}
+
+/**
+ * 提取结构化文本，保留文档层次结构（保留原函数作为备用）
+ * @param {Element} element 要处理的DOM元素
+ * @returns {string} 结构化文本
+ */
+function extractStructuredText(element) {
+    // 调用优化版本
+    return extractStructuredTextOptimized(element);
 }
 
 /**
@@ -247,56 +283,8 @@ async function loadTemplate(templateId) {
         return template.content.cloneNode(true);
     } catch (error) {
         console.error('Failed to load template:', error);
-        // 降级到内联模板
-        return createFallbackTemplate(templateId);
+        throw error;
     }
-}
-
-/**
- * 创建降级模板（当外部模板加载失败时使用）
- * @param {string} templateId 模板ID
- * @returns {DocumentFragment} 模板内容
- */
-function createFallbackTemplate(templateId) {
-    const fragment = document.createDocumentFragment();
-    const div = document.createElement('div');
-    
-    if (templateId === 'dialog-template') {
-        div.innerHTML = `
-            <div class="container">
-                <div class="header">
-                    <div class="header-title">Web Chat</div>
-                    <div class="header-controls">
-                        <button id="pinButton" class="header-btn" title="置顶">📌</button>
-                        <button id="resetSizeButton" class="header-btn" title="恢复默认窗口大小">⚏</button>
-                        <button id="closeButton" class="header-btn" title="关闭">✕</button>
-                    </div>
-                </div>
-                <div id="chat-container" class="chat-container">
-                    <div id="messages" class="messages"></div>
-                </div>
-                <div class="input-container">
-                    <textarea id="userInput" placeholder="请输入您的问题..." rows="2"></textarea>
-                    <button id="askButton" class="send-button"></button>
-                </div>
-            </div>
-            <div class="resize-handle resize-se"></div>
-            <div class="resize-handle resize-n"></div>
-            <div class="resize-handle resize-s"></div>
-            <div class="resize-handle resize-w"></div>
-            <div class="resize-handle resize-e"></div>
-            <div class="resize-handle resize-nw"></div>
-            <div class="resize-handle resize-ne"></div>
-            <div class="resize-handle resize-sw"></div>
-        `;
-    } else if (templateId === 'ball-icon-template') {
-        div.innerHTML = '💬';
-    } else if (templateId === 'settings-icon-template') {
-        div.innerHTML = '⚙️';
-    }
-    
-    fragment.appendChild(div);
-    return fragment;
 }
 
 /**
@@ -1305,24 +1293,23 @@ async function initializeDialog(dialog) {
             if (force || !userHasScrolled) {
                 requestAnimationFrame(() => {
                     requestAnimationFrame(() => {
-                        const messages = messagesContainer.children;
-                        if (messages.length > 0) {
-                            const lastMessage = messages[messages.length - 1];
-                            lastMessage.scrollIntoView({ behavior: 'smooth', block: 'end' });
-                        }
+                        messagesContainer.scrollTop = messagesContainer.scrollHeight;
                     });
                 });
             }
         }
 
+        // 监听滚动事件，检测用户是否手动滚动
         messagesContainer.addEventListener('scroll', () => {
-            if (!isGenerating) {
+            // 只在生成过程中检测用户滚动行为
+            if (isGenerating) {
                 const isAtBottom = Math.abs(
                     messagesContainer.scrollHeight -
                     messagesContainer.clientHeight -
                     messagesContainer.scrollTop
-                ) < 30;
+                ) < 10;
 
+                // 根据用户当前位置更新滚动状态
                 userHasScrolled = !isAtBottom;
             }
         });
@@ -1488,6 +1475,9 @@ async function initializeDialog(dialog) {
             const question = userInput.value.trim();
             if (!question) return;
 
+            // 重置滚动状态，确保新消息发送时自动滚动
+            userHasScrolled = false;
+            
             isGenerating = true;
             userInput.disabled = true;
             askButton.disabled = false;
@@ -1497,6 +1487,8 @@ async function initializeDialog(dialog) {
             try {
                 const pageContent = parseWebContent();
                 addMessage(question, true);
+                // 发送消息后立即滚动到最新位置
+                autoScroll(true);
                 const messageDiv = addMessage('', false);
                 const typingIndicator = addTypingIndicator();
 
@@ -1528,6 +1520,7 @@ async function initializeDialog(dialog) {
                             currentPort.disconnect();
                             currentPort = null;
                             currentAnswer = '';
+                            // 回复结束后重置滚动状态并滚动到最新位置
                             userHasScrolled = false;
                             autoScroll(true);
                         } else if (msg.type === 'error') {
