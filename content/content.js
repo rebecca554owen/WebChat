@@ -1,30 +1,85 @@
 /**
+ * 检查元素是否嵌套在已处理的元素集合中
+ * @param {Element} element 要检查的元素
+ * @param {Set} processedElements 已处理的元素集合
+ * @returns {boolean} 是否嵌套在已处理元素中
+ */
+function isNestedInProcessed(element, processedElements) {
+    let parent = element.parentElement;
+    while (parent) {
+        if (processedElements.has(parent)) {
+            return true;
+        }
+        parent = parent.parentElement;
+    }
+    return false;
+}
+
+/**
  * 解析网页内容，提取符合人类阅读习惯的结构化文本内容用于AI分析
  * 直接操作原始DOM，避免克隆开销，确保获取最新内容
  * @returns {string} 清理后的结构化网页文本内容
  */
 function parseWebContent() {
-    // 智能选择主要内容区域，直接从原始文档查询
-    const contentSelectors = [
-        'main', 'article', '.content', '.main-content', '.post-content',
-        '.entry-content', '[role="main"]', '.article-body', '.page-content'
-    ];
+    // 收集全部内容区域，使用前缀后缀匹配模式
+    const contentPrefixes = ['content', 'main', 'article', 'post', 'entry', 'body', 'text', 'story', 'message', 'product', 'course', 'chapter', 'section', 'markdown', 'blob', 'readme', 'abstract', 'documentation', 'wiki'];
+    const contentSuffixes = ['content', 'body', 'text', 'main', 'wrapper', 'container', 'area', 'section', 'details', 'description'];
     
-    let mainContent = null;
+    // 基础选择器
+    const baseSelectors = ['main', 'article', '[role="main"]'];
+    
+    // 动态生成选择器
+    function generateContentSelectors() {
+        const selectors = [...baseSelectors];
+        
+        // 添加类名选择器（前缀匹配）
+        contentPrefixes.forEach(prefix => {
+            selectors.push(`.${prefix}`);
+            contentSuffixes.forEach(suffix => {
+                if (prefix !== suffix) {
+                    selectors.push(`.${prefix}-${suffix}`);
+                    selectors.push(`.${prefix}_${suffix}`);
+                }
+            });
+        });
+        
+        return [...new Set(selectors)]; // 去重
+    }
+    
+    const contentSelectors = generateContentSelectors();
+    
+    // 收集所有匹配的内容区域
+    let contentAreas = [];
+    let processedElements = new Set();
+    
     for (const selector of contentSelectors) {
-        const candidate = document.querySelector(selector);
-        if (candidate && candidate.textContent.trim().length > 100) {
-            mainContent = candidate;
-            break;
+        const candidates = document.querySelectorAll(selector);
+        for (const candidate of candidates) {
+            if (candidate && 
+                candidate.textContent.trim().length > 50 && 
+                !processedElements.has(candidate) &&
+                !isNestedInProcessed(candidate, processedElements)) {
+                contentAreas.push(candidate);
+                processedElements.add(candidate);
+            }
         }
     }
     
-    if (!mainContent) {
-        mainContent = document.querySelector('body');
+    // 如果没有找到任何内容区域，使用body作为备选
+    if (contentAreas.length === 0) {
+        contentAreas.push(document.querySelector('body'));
     }
     
-    // 直接提取结构化文本，跳过不需要的元素
-    let structuredText = extractStructuredTextOptimized(mainContent);
+    // 提取所有内容区域的结构化文本并合并
+    let allStructuredText = [];
+    for (const contentArea of contentAreas) {
+        const text = extractStructuredTextOptimized(contentArea);
+        if (text && text.trim().length > 0) {
+            allStructuredText.push(text);
+        }
+    }
+    
+    let structuredText = allStructuredText.join('\n\n--- 内容分割线 ---\n\n');
     
     // 过滤无关内容
     structuredText = filterRelevantContent(structuredText);
@@ -1064,29 +1119,21 @@ function processCodeBlocks(container) {
         // 添加代码块样式类
         if (!preElement.classList.contains('code-block-processed')) {
             preElement.classList.add('code-block-processed');
-            
-            // 检测语言类型
-            const className = codeElement.className;
-            const languageMatch = className.match(/language-(\w+)/);
-            const language = languageMatch ? languageMatch[1] : 'text';
-            
-            // 添加语言标签
-            if (language !== 'text') {
-                const languageLabel = document.createElement('div');
-                languageLabel.className = 'code-language-label';
-                languageLabel.textContent = language;
-                preElement.insertBefore(languageLabel, codeElement);
-            }
-            
+      
             // 添加复制按钮
             const copyButton = document.createElement('button');
             copyButton.className = 'code-copy-button';
-            copyButton.textContent = '复制';
+            copyButton.innerHTML = '📋';
             copyButton.onclick = () => {
                 navigator.clipboard.writeText(codeElement.textContent).then(() => {
-                    copyButton.textContent = '已复制';
+                    copyButton.innerHTML = '✅';
                     setTimeout(() => {
-                        copyButton.textContent = '复制';
+                        copyButton.innerHTML = '📋';
+                    }, 2000);
+                }).catch(() => {
+                    copyButton.innerHTML = '❌';
+                    setTimeout(() => {
+                        copyButton.innerHTML = '📋';
                     }, 2000);
                 });
             };
