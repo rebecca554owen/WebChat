@@ -1,0 +1,20 @@
+{
+  "shared": {
+    "id": "WebChat",
+    "input": {
+      "chromium": "./"
+    },
+    "output": "./dist"
+  },
+  "build": [
+    {
+      "type": "chrome"
+    },
+    {
+      "type": "edge"
+    },
+    {
+      "type": "safari"
+    }
+  ]
+}
