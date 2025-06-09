@@ -1,0 +1,66 @@
+name: Build Extensions
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '输入发布的Tag，例如：v1.0.0'
+        required: true
+        default: 'v1.0.0'
+
+jobs:
+  build:
+    runs-on: macos-latest  # Safari 扩展必须在 macOS 上构建
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Bepp
+        run: npm install -g @bepp/bepp
+
+      - name: Build extensions
+        run: bepp build
+
+      - name: Set build environment variables
+        run: |
+          echo "BUILD_TIME=$(TZ='Asia/Shanghai' date +'%Y-%m-%d %H:%M:%S')" >> $GITHUB_ENV
+
+      - name: Get tag
+        id: get-tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" = "push" ] && [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=v1.0.0" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Validate tag
+        run: |
+          tag="${{ steps.get-tag.outputs.tag }}"
+          if [[ "$tag" != "latest" && ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "错误：标签格式无效，应为v*.*.*或latest"
+            exit 1
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: success()
+        with:
+          files: dist/*
+          tag_name: ${{ steps.get-tag.outputs.tag }}
+          name: "${{ steps.get-tag.outputs.tag }}"
+          body: |
+            ## WebChat Multi-Browser Extensions
+            ### 📦 支持的浏览器
+            - 🌐 Chrome
+            - 🔷 Microsoft Edge
+            - 🍎 Safari (macOS)
+            
+            ### 📅 构建信息
+            - 构建时间: ${{ env.BUILD_TIME }}
+            - 提交哈希: ${{ github.sha }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
